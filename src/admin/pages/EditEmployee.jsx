@@ -34,6 +34,7 @@ const EditEmployee = () => {
   const [documents, setDocuments] = useState({
     avatar: null,
     avatarFile: null,
+    passport_size_photo: null,
     passport_1st_page: null,
     passport_2nd_page: null,
     passport_outer_page: null,
@@ -171,7 +172,6 @@ const EditEmployee = () => {
   }, [watchOrganizationId, organizations, dispatch, setValue]);
 
   // Get company details when company_id changes
-  // Get company details when company_id changes or when companies are loaded
   useEffect(() => {
     if (watchCompanyId && companies.length > 0) {
       const company = companies.find(
@@ -461,7 +461,6 @@ const EditEmployee = () => {
           "type",
           "dob",
           "joining_date",
-          "special_days",
         ];
         // Only add company_id to validation if multi_company is "Yes"
         if (selectedOrgDetails?.multi_company === "Yes") {
@@ -472,23 +471,12 @@ const EditEmployee = () => {
       case 1:
         return ["passport_issued_date", "passport_expiry_date"];
       case 2: {
-        const laborFields = [];
-
-        // Only require labor fields if company trade license is "mainland"
-        if (selectedCompanyDetails?.raw?.trade_license === "mainland") {
-          laborFields.push(
-            "labor_number",
-            "labor_issued_date",
-            "labor_expiry_date",
-          );
-        }
 
         return [
           "visa_type",
           "visa_number",
           "visa_issued_date",
           "visa_expiry_date",
-          ...laborFields,
           "eid_number",
           "eid_issued_date",
           "eid_expiry_date",
@@ -1372,22 +1360,6 @@ const EditEmployee = () => {
                                 {selectedCompanyDetails.raw?.trade_license.toUpperCase()}
                               </span>
                             </span>
-                            {selectedCompanyDetails.raw?.trade_license ===
-                              "mainland" && (
-                              <span className="text-xs text-gray-600 ml-2">
-                                <i className="fas fa-info-circle mr-1"></i>
-                                Labor details are required for Mainland
-                                companies
-                              </span>
-                            )}
-                            {selectedCompanyDetails.raw?.trade_license ===
-                              "freezone" && (
-                              <span className="text-xs text-gray-600 ml-2">
-                                <i className="fas fa-info-circle mr-1"></i>
-                                Labor details are not required for Freezone
-                                companies
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1636,8 +1608,8 @@ const EditEmployee = () => {
                     </div>
                   </div>
 
-                  {/* Employee ID */}
-                  <div>
+                  {/* Employee ID - Read Only */}
+                  <div className="md:col-span-2">
                     <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                       <i className="fas fa-id-card text-green-500 mr-1"></i>{" "}
                       Employee ID <span className="text-red-500">*</span>
@@ -1652,7 +1624,7 @@ const EditEmployee = () => {
                             type="text"
                             readOnly
                             disabled
-                            className={`w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 border rounded-lg text-sm md:text-base text-gray-600 cursor-not-allowed ${errors.employee_id ? "border-red-500" : "border-gray-200"}`}
+                            className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-100 border border-gray-200 rounded-lg text-sm md:text-base text-gray-600 cursor-not-allowed"
                             placeholder="Employee ID"
                           />
                           {errors.employee_id && (
@@ -2061,25 +2033,15 @@ const EditEmployee = () => {
                     <div className="border border-gray-200 rounded-lg p-4">
                       <h4 className="text-sm font-semibold text-gray-700 mb-4">
                         Labor Details
-                        <span className="text-xs text-red-500 ml-2">
-                          * Required for Mainland companies
-                        </span>
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                            Labor Number <span className="text-red-500">*</span>
+                            Labor Number 
                           </label>
                           <Controller
                             name="labor_number"
                             control={control}
-                            rules={{
-                              required:
-                                selectedCompanyDetails?.raw?.trade_license ===
-                                "mainland"
-                                  ? "Labor number is required for Mainland companies"
-                                  : false,
-                            }}
                             render={({ field }) => (
                               <>
                                 <input
@@ -2100,25 +2062,11 @@ const EditEmployee = () => {
 
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                            Labor Issued Date{" "}
-                            <span className="text-red-500">*</span>
+                            Labor Issued Date
                           </label>
                           <Controller
                             name="labor_issued_date"
                             control={control}
-                            rules={{
-                              required:
-                                selectedCompanyDetails?.raw?.trade_license ===
-                                "mainland"
-                                  ? "Labor issued date is required for Mainland companies"
-                                  : false,
-                              validate: (value) =>
-                                validateIssueDate(
-                                  value,
-                                  laborExpiry,
-                                  "Labor issued date",
-                                ),
-                            }}
                             render={({ field }) => (
                               <DateInput
                                 {...field}
@@ -2131,25 +2079,11 @@ const EditEmployee = () => {
 
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                            Labor Expiry Date{" "}
-                            <span className="text-red-500">*</span>
+                            Labor Expiry Date
                           </label>
                           <Controller
                             name="labor_expiry_date"
                             control={control}
-                            rules={{
-                              required:
-                                selectedCompanyDetails?.raw?.trade_license ===
-                                "mainland"
-                                  ? "Labor expiry date is required for Mainland companies"
-                                  : false,
-                              validate: (value) =>
-                                validateExpiryDate(
-                                  value,
-                                  laborIssued,
-                                  "Labor expiry date",
-                                ),
-                            }}
                             render={({ field }) => (
                               <DateInput
                                 {...field}
