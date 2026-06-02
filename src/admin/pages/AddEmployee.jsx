@@ -1344,9 +1344,6 @@ const AddEmployee = () => {
                             <Controller
                               name={`special_days.${index}.name`}
                               control={control}
-                              rules={{
-                                required: "Name is required"
-                              }}
                               render={({ field }) => (
                                 <div>
                                   <input
@@ -1372,9 +1369,6 @@ const AddEmployee = () => {
                             <Controller
                               name={`special_days.${index}.date`}
                               control={control}
-                              rules={{
-                                required: "Date is required"
-                              }}
                               render={({ field }) => (
                                 <div>
                                   <DateInput
@@ -2006,20 +2000,16 @@ const AddEmployee = () => {
                       <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
                         <i className="fas fa-briefcase text-green-500 mr-2"></i>
                         Labor Details
-                        <span className="text-xs text-red-500 ml-2">* Required for Mainland companies</span>
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                             <i className="fas fa-briefcase text-green-500 mr-1"></i>{" "}
-                            Labor Number <span className="text-red-500">*</span>
+                            Labor Number
                           </label>
                           <Controller
                             name="labor_number"
                             control={control}
-                            rules={{ 
-                              required: selectedCompanyDetails?.raw?.trade_license === "mainland" ? "Labor number is required for Mainland companies" : false 
-                            }}
                             render={({ field }) => (
                               <>
                                 <input
@@ -2041,20 +2031,11 @@ const AddEmployee = () => {
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                             <i className="fas fa-calendar-plus text-green-500 mr-1"></i>{" "}
-                            Labor Issued Date <span className="text-red-500">*</span>
+                            Labor Issued Date 
                           </label>
                           <Controller
                             name="labor_issued_date"
                             control={control}
-                            rules={{
-                              required: selectedCompanyDetails?.raw?.trade_license === "mainland" ? "Labor issued date is required for Mainland companies" : false,
-                              validate: (value) =>
-                                validateIssueDate(
-                                  value,
-                                  laborExpiry,
-                                  "Labor issued date",
-                                ),
-                            }}
                             render={({ field }) => (
                               <>
                                 <DateInput
@@ -2075,20 +2056,11 @@ const AddEmployee = () => {
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                             <i className="fas fa-calendar-times text-green-500 mr-1"></i>{" "}
-                            Labor Expiry Date <span className="text-red-500">*</span>
+                            Labor Expiry Date
                           </label>
                           <Controller
                             name="labor_expiry_date"
                             control={control}
-                            rules={{
-                              required: selectedCompanyDetails?.raw?.trade_license === "mainland" ? "Labor expiry date is required for Mainland companies" : false,
-                              validate: (value) =>
-                                validateExpiryDate(
-                                  value,
-                                  laborIssued,
-                                  "Labor expiry date",
-                                ),
-                            }}
                             render={({ field }) => (
                               <>
                                 <DateInput
