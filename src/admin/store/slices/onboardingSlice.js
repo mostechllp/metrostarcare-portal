@@ -9,10 +9,10 @@ export const parseResume = createAsyncThunk(
     try {
       // 1. Extract text from the file (PDF or DOCX) client-side
       const text = await extractTextFromFile(file);
-      
+
       // 2. Send extracted text to OpenRouter for AI processing
       const parsedData = await parseResumeTextWithAI(text);
-      
+
       // 3. Return the sanitized employee details along with filename
       return {
         ...parsedData,
@@ -42,6 +42,14 @@ const initialState = {
     experience: "",
     education: "",
     joiningDate: "",
+    basicSalary: "",
+    otherAllowance: "",
+    totalMonthlySalary: 0,
+    paymentCycle: "Monthly",
+    bankName: "",
+    accountNumber: "",
+    specialDayEvent: "",
+    specialDayDate: "",
   },
   offerLetter: {
     content: "",
@@ -93,10 +101,10 @@ const onboardingSlice = createSlice({
   },
 });
 
-export const { 
-  setStep, 
-  updateEmployeeDetails, 
-  updateOfferLetter, 
+export const {
+  setStep,
+  updateEmployeeDetails,
+  updateOfferLetter,
   resetOnboarding,
   completeOnboarding,
   restoreDraft

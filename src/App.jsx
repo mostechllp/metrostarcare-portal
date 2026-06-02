@@ -75,6 +75,13 @@ const Settings = lazy(() => import("./admin/pages/Settings"));
 const RoleManagement = lazy(() => import("./admin/pages/RoleManagement"));
 const AddPayroll = lazy(() => import("./admin/pages/AddPayroll"));
 const Onboarding = lazy(() => import("./admin/pages/Onboarding"));
+const OffboardingInitiation = lazy(() => import("./admin/pages/OffboardingInitiation"));
+const VisaCancellationAndExit = lazy(() => import("./admin/pages/VisaCancellationAndExit"));
+const OffboardingChecklist = lazy(() => import("./admin/pages/OffboardingChecklist"));
+const AssetReturn = lazy(() => import("./admin/pages/AssetReturn"));
+const ExitInterview = lazy(() => import("./admin/pages/ExitInterview"));
+const FinalSettlement = lazy(() => import("./admin/pages/FinalSettlement"));
+const LettersAndClearance = lazy(() => import("./admin/pages/LettersAndClearance"));
 
 // Lazy load pages - Employee
 const EmployeeDashboard = lazy(() => import("./employee/pages/Dashboard"));
@@ -149,6 +156,13 @@ function App() {
           <Route path="employees" element={<Employees />} />
           <Route path="employees/add-employee" element={<AddEmployee />} />
           <Route path="employees/onboarding" element={<Onboarding />} />
+          <Route path="employees/offboarding-initiation" element={<OffboardingInitiation />} />
+          <Route path="employees/visa-cancellation" element={<VisaCancellationAndExit />} />
+          <Route path="employees/offboarding-checklist" element={<OffboardingChecklist />} />
+          <Route path="employees/asset-return" element={<AssetReturn />} />
+          <Route path="employees/exit-interview" element={<ExitInterview />} />
+          <Route path="employees/final-settlement" element={<FinalSettlement />} />
+          <Route path="employees/letters-and-clearance" element={<LettersAndClearance />} />
           <Route path="employees/edit/:id" element={<EditEmployee />} />
           <Route path="employees/:id" element={<EmployeeDetails />} />
           <Route path="organizations" element={<Organizations />} />

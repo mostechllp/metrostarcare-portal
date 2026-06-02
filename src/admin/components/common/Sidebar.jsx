@@ -31,6 +31,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       icon: "fas fa-user-plus",
       label: "Onboarding",
     },
+    {
+      path: "/admin/employees/offboarding-initiation",
+      icon: "fas fa-user-minus",
+      label: "Offboarding",
+    },
     { path: "/admin/employees", icon: "fas fa-users", label: "Employees" },
     { path: "/admin/attendances", icon: "fas fa-fingerprint", label: "Attendance" },
     { path: "/admin/agreements", icon: "fas fa-file-signature", label: "Agreements" },
