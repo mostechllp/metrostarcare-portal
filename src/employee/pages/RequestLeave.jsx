@@ -4,14 +4,15 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addLeaveRequest, fetchEmployeeLeaves, fetchLeaveBalance } from '../store/slices/leavesSlice';
 import { FiChevronRight, FiCalendar, FiTag, FiMessageSquare, FiPaperclip, FiSend, FiX, FiAlertCircle } from 'react-icons/fi';
 import { MdCalculate } from 'react-icons/md';
+import apiClient from '../../utils/apiClient';
 
 const RequestLeave = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const leavesState = useSelector((state) => state.leaves);
+  const leavesState = useSelector((state) => state.EmpLeaves);
   
-  // Add safety defaults - FIXES THE ERROR
-  const leaveBalances = leavesState?.leaveBalances || { total: { allocated: 0, taken: 0, pending: 0, remaining: 0 } };
+  // Add safety defaults
+  const leaveBalances = leavesState?.leaveBalances || {};
   const submitting = leavesState?.submitting || false;
   const error = leavesState?.error || null;
   
@@ -34,10 +35,24 @@ const RequestLeave = () => {
     };
     fetchData();
   }, [dispatch]);
+
+  // Add this temporary debug function in your component
+const debugBackendBalance = async () => {
+  try {
+    const response = await apiClient.get("/employee/leave-balance");
+    console.log("Backend leave balance check:", response.data);
+  } catch (error) {
+    console.error("Backend balance check error:", error);
+  }
+};
+
+// Call it in useEffect
+useEffect(() => {
+  debugBackendBalance();
+}, []);
   
   // Calculate days when dates change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
     calculateDays();
   }, [formData.fromDate, formData.toDate]);
   
@@ -84,6 +99,13 @@ const RequestLeave = () => {
       return;
     }
     
+    // Check if exceeds balance
+    const selectedLeaveBalance = getLeaveBalanceForType(formData.leaveType);
+    if (totalDays > selectedLeaveBalance.remaining && selectedLeaveBalance.remaining >= 0) {
+      setLocalError(`Requested days (${totalDays}) exceed available balance (${selectedLeaveBalance.remaining} days)`);
+      return;
+    }
+    
     const formDataToSend = {
       leaveType: formData.leaveType,
       fromDate: formData.fromDate,
@@ -102,17 +124,37 @@ const RequestLeave = () => {
     }
   };
   
-  // Get balance values with safety defaults
-  const totalBalance = leaveBalances?.total || { allocated: 0, taken: 0, pending: 0, remaining: 0 };
-  const currentLeaveBalance = leaveBalances?.[formData.leaveType] || totalBalance;
+  // Helper function to get leave balance for a specific type
+  const getLeaveBalanceForType = (leaveTypeName) => {
+    // First check if we have the specific leave type in the balances
+    if (leaveBalances && leaveBalances[leaveTypeName]) {
+      return leaveBalances[leaveTypeName];
+    }
+    
+    // If not found, return total balance as fallback
+    return leaveBalances.total || { allocated: 0, taken: 0, pending: 0, remaining: 0 };
+  };
   
-  const remaining = currentLeaveBalance?.remaining ?? totalBalance?.remaining ?? 0;
-  const usedLeaves = currentLeaveBalance?.taken ?? totalBalance?.taken ?? 0;
+  // Get the current leave type balance
+  const currentLeaveBalance = getLeaveBalanceForType(formData.leaveType);
+  
+  // Get total balance from the store
+  const totalBalance = leaveBalances.total || { allocated: 0, taken: 0, pending: 0, remaining: 0 };
+  
+  const remaining = currentLeaveBalance?.remaining ?? 0;
+  const usedLeaves = currentLeaveBalance?.taken ?? 0;
   const pendingLeaves = currentLeaveBalance?.pending ?? 0;
-  const allocatedLeaves = currentLeaveBalance?.allocated ?? totalBalance?.allocated ?? 0;
+  const allocatedLeaves = currentLeaveBalance?.allocated ?? 0;
   
   // Check if requested days exceed balance
   const exceedsBalance = totalDays > remaining && remaining >= 0;
+  
+  // Log for debugging
+  useEffect(() => {
+    console.log("Leave Balances from store:", leaveBalances);
+    console.log("Current leave type:", formData.leaveType);
+    console.log("Current balance:", currentLeaveBalance);
+  }, [leaveBalances, formData.leaveType, currentLeaveBalance]);
   
   return (
     <div className="p-4 md:p-6">
