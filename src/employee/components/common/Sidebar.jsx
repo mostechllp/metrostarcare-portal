@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../store/hooks";
-import { useState } from "react";
-import MissedPunchOutModal from "../modals/MissedPunchoutModal";
-import MissedPunchInModal from "../modals/MissedPunchInModal";
-import LateCheckinModal from "../modals/LateCheckinModal";
-import EarlyCheckinModal from "../modals/EarlyCheckinModal";
+// import { useState } from "react";
+// import MissedPunchOutModal from "../modals/MissedPunchoutModal";
+// import MissedPunchInModal from "../modals/MissedPunchInModal";
+// import LateCheckinModal from "../modals/LateCheckinModal";
+// import EarlyCheckinModal from "../modals/EarlyCheckinModal";
 
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -13,46 +13,47 @@ const Sidebar = ({ isOpen, onClose }) => {
   console.log("User: ", user)
 
   // Modal states
-  const [showEarlyCheckin, setShowEarlyCheckin] = useState(false);
-  const [showLateCheckin, setShowLateCheckin] = useState(false);
-  const [showMissedPunchIn, setShowMissedPunchIn] = useState(false);
-  const [showMissedPunchOut, setShowMissedPunchOut] = useState(false);
+  // const [showEarlyCheckin, setShowEarlyCheckin] = useState(false);
+  // const [showLateCheckin, setShowLateCheckin] = useState(false);
+  // const [showMissedPunchIn, setShowMissedPunchIn] = useState(false);
+  // const [showMissedPunchOut, setShowMissedPunchOut] = useState(false);
+  
   const navItems = [
     { path: "/employee/dashboard", icon: "fas fa-chart-line", label: "Dashboard" },
     { path: "/employee/leaves", icon: "fas fa-calendar-check", label: "My Leaves" },
-    { path: "/employee/wfh", icon: "fas fa-home", label: "WFH Requests" },
-    {
-      path: "/employee/task-reports",
-      icon: "fas fa-clipboard-list",
-      label: "Task Reports",
-    },
+    // { path: "/employee/wfh", icon: "fas fa-home", label: "WFH Requests" }, // Commented out
+    // {
+    //   path: "/employee/task-reports",
+    //   icon: "fas fa-clipboard-list",
+    //   label: "Task Reports",
+    // }, // Commented out
     { path: "/employee/profile", icon: "fas fa-user-circle", label: "My Profile" },
   ];
 
-  const attendanceSubmenus = [
-    {
-      label: "Early Check-in",
-      icon: "fas fa-sun",
-      action: () => setShowEarlyCheckin(true)
-    },
-    {
-      label: "Late Check-in",
-      icon: "fas fa-moon",
-      action: () => setShowLateCheckin(true)
-    },
-    {
-      label: "Missed Punch In",
-      icon: "fas fa-fingerprint",
-      action: () => setShowMissedPunchIn(true)
-    },
-    {
-      label: "Missed Punch Out",
-      icon: "fas fa-door-open",
-      action: () => setShowMissedPunchOut(true)
-    },
-  ];
+  // const attendanceSubmenus = [
+  //   {
+  //     label: "Early Check-in",
+  //     icon: "fas fa-sun",
+  //     action: () => setShowEarlyCheckin(true)
+  //   },
+  //   {
+  //     label: "Late Check-in",
+  //     icon: "fas fa-moon",
+  //     action: () => setShowLateCheckin(true)
+  //   },
+  //   {
+  //     label: "Missed Punch In",
+  //     icon: "fas fa-fingerprint",
+  //     action: () => setShowMissedPunchIn(true)
+  //   },
+  //   {
+  //     label: "Missed Punch Out",
+  //     icon: "fas fa-door-open",
+  //     action: () => setShowMissedPunchOut(true)
+  //   },
+  // ];
 
-  const isMyRequestsActive = location.pathname === "/employee/attendance-requests";
+  // const isMyRequestsActive = location.pathname === "/employee/attendance-requests";
 
   return (
     <>
@@ -81,9 +82,8 @@ const Sidebar = ({ isOpen, onClose }) => {
             );
           })}
 
-          {/* Attendance Requests Section */}
-          <div className="nav-section">
-            {/* My Requests - Main Menu Item that navigates to the page */}
+          {/* Attendance Requests Section - Commented out */}
+          {/* <div className="nav-section">
             <Link
               to="/employee/attendance-requests"
               onClick={onClose}
@@ -93,7 +93,6 @@ const Sidebar = ({ isOpen, onClose }) => {
               <span>My Requests</span>
             </Link>
 
-            {/* Submenu Items - Open Modals */}
             <div className="nav-submenu">
               {attendanceSubmenus.map((submenu, index) => (
                 <button
@@ -109,12 +108,12 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
         </nav>
       </aside>
 
-      {/* Modals */}
-      <EarlyCheckinModal
+      {/* Modals - Commented out since they're only used by the commented menu items */}
+      {/* <EarlyCheckinModal
         isOpen={showEarlyCheckin}
         onClose={() => setShowEarlyCheckin(false)}
       />
@@ -129,7 +128,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       <MissedPunchOutModal
         isOpen={showMissedPunchOut}
         onClose={() => setShowMissedPunchOut(false)}
-      />
+      /> */}
     </>
   );
 };
