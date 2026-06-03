@@ -86,6 +86,7 @@ const AddEmployee = () => {
       nationality: "",
       marital_status: "",
       special_days: [{ name: "", date: "" }],
+      moh_license_number: "",
 
       // Step 2: Passport Details
       passport_full_name: "",
@@ -142,6 +143,7 @@ const AddEmployee = () => {
   const laborExpiry = watch("labor_expiry_date");
   const eidIssued = watch("eid_issued_date");
   const eidExpiry = watch("eid_expiry_date");
+  const watchRole = watch("role");
 
   // Generate Employee ID function
   const generateEmployeeId = (dob, joiningDate) => {
@@ -231,7 +233,7 @@ const AddEmployee = () => {
         (comp) => comp.id === parseInt(watchCompanyId),
       );
       setSelectedCompanyDetails(company || null);
-      
+
       // Clear labor fields if company has freezone trade license
       if (company && company.raw?.trade_license === "freezone") {
         setValue("labor_number", "");
@@ -269,6 +271,13 @@ const AddEmployee = () => {
     "Other",
   ];
 
+  const getMohLicenseRequired = (roleId) => {
+    if (!roleId) return false;
+    const selectedRole = roles.find((role) => role.id === parseInt(roleId));
+    const roleName = selectedRole?.name?.toLowerCase();
+    return roleName === "doctor" || roleName === "nurse";
+  };
+
   const maritalStatusOptions = ["Single", "Married", "Divorced", "Widowed"];
   const visaTypeOptions = [
     { value: "company_visa", label: "Company Visa" },
@@ -288,7 +297,18 @@ const AddEmployee = () => {
           "dob",
           "joining_date",
           "special_days",
+          "role",
         ];
+        const selectedRole = roles.find(
+          (role) => role.id === parseInt(watchRole),
+        );
+        if (
+          selectedRole?.name?.toLowerCase() === "doctor" ||
+          selectedRole?.name?.toLowerCase() === "nurse"
+        ) {
+          fields.push("moh_license_number");
+        }
+
         // Only add company_id to validation if multi_company is "Yes"
         if (selectedOrgDetails?.multi_company === "Yes") {
           fields.push("company_id");
@@ -297,18 +317,18 @@ const AddEmployee = () => {
       }
       case 1:
         return ["passport_issued_date", "passport_expiry_date"];
-      case 2:
-        { const laborFields = [];
-        
+      case 2: {
+        const laborFields = [];
+
         // Only require labor fields if company trade license is "mainland"
         if (selectedCompanyDetails?.raw?.trade_license === "mainland") {
           laborFields.push(
             "labor_number",
             "labor_issued_date",
-            "labor_expiry_date"
+            "labor_expiry_date",
           );
         }
-        
+
         return [
           "visa_type",
           "visa_number",
@@ -318,9 +338,10 @@ const AddEmployee = () => {
           "eid_number",
           "eid_issued_date",
           "eid_expiry_date",
-        ]; }
+        ];
+      }
       case 3:
-        return ["company_email", "personal_email", "type", "role"];
+        return ["company_email", "personal_email", "type"];
       default:
         return [];
     }
@@ -570,6 +591,8 @@ const AddEmployee = () => {
     const isSkilledValue = isSkilled !== null ? (isSkilled ? 1 : 0) : 0;
     formData.append("is_skilled", isSkilledValue);
 
+    formData.append("moh_license_number", data.moh_license_number || "");
+
     if (data.designation_id) {
       formData.append("designation_id", parseInt(data.designation_id));
     }
@@ -656,7 +679,7 @@ const AddEmployee = () => {
     // Only send labor data if company trade license is "mainland"
     if (selectedCompanyDetails?.raw?.trade_license === "mainland") {
       formData.append("labor_number", data.labor_number || "");
-      
+
       const laborIssuedConverted = convertDateToBackend(data.labor_issued_date);
       formData.append("labor_issued_date", laborIssuedConverted);
 
@@ -855,6 +878,9 @@ const AddEmployee = () => {
     },
     role: {
       required: "Role is required",
+    },
+    moh_license_number: {
+      required: false, // Will be conditionally required
     },
     company_email: {
       pattern: {
@@ -1135,33 +1161,49 @@ const AddEmployee = () => {
                   </div>
 
                   {/* Show trade license info when company is selected */}
-                  {selectedCompanyDetails && selectedCompanyDetails.raw?.trade_license && (
-                    <div className="md:col-span-2">
-                      <div className={`p-3 rounded-lg ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "bg-blue-50 border border-blue-200" : "bg-yellow-50 border border-yellow-200"}`}>
-                        <div className="flex items-center gap-2">
-                          <i className={`fas ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "fa-building" : "fa-globe"} ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "text-blue-600" : "text-yellow-600"}`}></i>
-                          <span className="text-sm font-semibold text-gray-700">
-                            Company Trade License:{" "}
-                            <span className={selectedCompanyDetails.raw?.trade_license === "mainland" ? "text-blue-600" : "text-yellow-600"}>
-                              {selectedCompanyDetails.raw?.trade_license.toUpperCase()}
+                  {selectedCompanyDetails &&
+                    selectedCompanyDetails.raw?.trade_license && (
+                      <div className="md:col-span-2">
+                        <div
+                          className={`p-3 rounded-lg ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "bg-blue-50 border border-blue-200" : "bg-yellow-50 border border-yellow-200"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <i
+                              className={`fas ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "fa-building" : "fa-globe"} ${selectedCompanyDetails.raw?.trade_license === "mainland" ? "text-blue-600" : "text-yellow-600"}`}
+                            ></i>
+                            <span className="text-sm font-semibold text-gray-700">
+                              Company Trade License:{" "}
+                              <span
+                                className={
+                                  selectedCompanyDetails.raw?.trade_license ===
+                                  "mainland"
+                                    ? "text-blue-600"
+                                    : "text-yellow-600"
+                                }
+                              >
+                                {selectedCompanyDetails.raw?.trade_license.toUpperCase()}
+                              </span>
                             </span>
-                          </span>
-                          {selectedCompanyDetails.raw?.trade_license === "mainland" && (
-                            <span className="text-xs text-gray-600 ml-2">
-                              <i className="fas fa-info-circle mr-1"></i>
-                              Labor details are required for Mainland companies
-                            </span>
-                          )}
-                          {selectedCompanyDetails.raw?.trade_license === "freezone" && (
-                            <span className="text-xs text-gray-600 ml-2">
-                              <i className="fas fa-info-circle mr-1"></i>
-                              Labor details are not required for Freezone companies
-                            </span>
-                          )}
+                            {selectedCompanyDetails.raw?.trade_license ===
+                              "mainland" && (
+                              <span className="text-xs text-gray-600 ml-2">
+                                <i className="fas fa-info-circle mr-1"></i>
+                                Labor details are required for Mainland
+                                companies
+                              </span>
+                            )}
+                            {selectedCompanyDetails.raw?.trade_license ===
+                              "freezone" && (
+                              <span className="text-xs text-gray-600 ml-2">
+                                <i className="fas fa-info-circle mr-1"></i>
+                                Labor details are not required for Freezone
+                                companies
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   <div>
                     <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
@@ -1331,6 +1373,100 @@ const AddEmployee = () => {
                     />
                   </div>
 
+                  {/* Role and MOH License Number */}
+                  <div className="md:col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                      {/* Role Selection */}
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
+                          <i className="fas fa-user-tag text-green-500 mr-1"></i>{" "}
+                          Role <span className="text-red-500">*</span>
+                        </label>
+                        <Controller
+                          name="role"
+                          control={control}
+                          rules={validationRules.role}
+                          render={({ field }) => (
+                            <>
+                              <select
+                                {...field}
+                                className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm md:text-base text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                              >
+                                <option value="">Select Role</option>
+                                {roles.map((role) => (
+                                  <option key={role.id} value={role.id}>
+                                    {role.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {errors.role && (
+                                <p className="mt-1 text-xs text-red-500">
+                                  {errors.role.message}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        />
+                      </div>
+
+                      {/* MOH License Number - Only shown and required for Doctor/Nurse roles */}
+                      {watchRole &&
+                        (() => {
+                          const selectedRole = roles.find(
+                            (role) => role.id === parseInt(watchRole),
+                          );
+                          const isDoctorOrNurse =
+                            selectedRole?.name?.toLowerCase() === "doctor" ||
+                            selectedRole?.name?.toLowerCase() === "nurse";
+                          return isDoctorOrNurse ? (
+                            <div>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
+                                <i className="fas fa-id-card text-green-500 mr-1"></i>{" "}
+                                MOH License Number{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <Controller
+                                name="moh_license_number"
+                                control={control}
+                                rules={{
+                                  required:
+                                    "MOH License Number is required for doctors and nurses",
+                                  pattern: {
+                                    value: /^[A-Z0-9-]+$/i,
+                                    message:
+                                      "Please enter a valid license number",
+                                  },
+                                }}
+                                render={({ field }) => (
+                                  <>
+                                    <input
+                                      {...field}
+                                      type="text"
+                                      className={`w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border rounded-lg text-sm md:text-base text-gray-800 focus:outline-none focus:ring-2 ${errors.moh_license_number ? "border-red-500" : "border-gray-200 focus:border-green-500"}`}
+                                      placeholder="Enter MOH License Number (e.g., MOH-12345)"
+                                    />
+                                    {errors.moh_license_number && (
+                                      <p className="mt-1 text-xs text-red-500">
+                                        {errors.moh_license_number.message}
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      <i className="fas fa-info-circle mr-1"></i>
+                                      Required for medical professionals
+                                      (Doctors and Nurses)
+                                    </p>
+                                  </>
+                                )}
+                              />
+                            </div>
+                          ) : (
+                            /* Empty div to maintain layout when MOH License is not shown */
+                            <div></div>
+                          );
+                        })()}
+                    </div>
+                  </div>
+
                   {/* Special Days - Array of name and date */}
                   <div className="md:col-span-2">
                     <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
@@ -1351,8 +1487,8 @@ const AddEmployee = () => {
                                     type="text"
                                     placeholder="e.g., Birthday / Anniversary"
                                     className={`w-full px-3 py-2 bg-gray-50 border rounded-lg text-sm focus:outline-none ${
-                                      errors?.special_days?.[index]?.name 
-                                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" 
+                                      errors?.special_days?.[index]?.name
+                                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                                         : "border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
                                     }`}
                                   />
@@ -1375,7 +1511,9 @@ const AddEmployee = () => {
                                     type="special_day"
                                     {...field}
                                     placeholder="dd/mm/yyyy"
-                                    error={!!errors?.special_days?.[index]?.date}
+                                    error={
+                                      !!errors?.special_days?.[index]?.date
+                                    }
                                   />
                                   {errors?.special_days?.[index]?.date && (
                                     <p className="mt-1 text-xs text-red-500">
@@ -1995,7 +2133,8 @@ const AddEmployee = () => {
                 </div>
                 <div className="space-y-6">
                   {/* Labor Section - Only show for Mainland companies */}
-                  {selectedCompanyDetails?.raw?.trade_license === "mainland" && (
+                  {selectedCompanyDetails?.raw?.trade_license ===
+                    "mainland" && (
                     <div className="border border-gray-200 rounded-lg p-4 md:p-5">
                       <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center">
                         <i className="fas fa-briefcase text-green-500 mr-2"></i>
@@ -2031,7 +2170,7 @@ const AddEmployee = () => {
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                             <i className="fas fa-calendar-plus text-green-500 mr-1"></i>{" "}
-                            Labor Issued Date 
+                            Labor Issued Date
                           </label>
                           <Controller
                             name="labor_issued_date"
@@ -2307,7 +2446,8 @@ const AddEmployee = () => {
                           icon="fas fa-file-contract"
                         />
                         {/* Only show labor documents for Mainland companies */}
-                        {selectedCompanyDetails?.raw?.trade_license === "mainland" && (
+                        {selectedCompanyDetails?.raw?.trade_license ===
+                          "mainland" && (
                           <>
                             <DocumentUpload
                               fieldKey="labor_card"
@@ -2494,31 +2634,6 @@ const AddEmployee = () => {
                             </p>
                           )}
                         </>
-                      )}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                      <i className="fas fa-user-tag text-green-500 mr-1"></i>{" "}
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <Controller
-                      name="role"
-                      control={control}
-                      rules={validationRules.role}
-                      render={({ field }) => (
-                        <select
-                          {...field}
-                          className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm md:text-base text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                        >
-                          <option value="">Select Role</option>
-                          {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {role.name}
-                            </option>
-                          ))}
-                        </select>
                       )}
                     />
                   </div>

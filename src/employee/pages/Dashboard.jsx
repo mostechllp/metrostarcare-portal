@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { punchIn, punchOut, fetchDashboardData } from '../store/slices/attendanceSlice';
-import PunchOutModal from '../components/modals/PunchOutModal';
+// import { punchIn, punchOut, fetchDashboardData } from '../store/slices/attendanceSlice';
+import { fetchDashboardData } from '../store/slices/attendanceSlice';
+// import PunchOutModal from '../components/modals/PunchOutModal';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -13,16 +14,16 @@ const Dashboard = () => {
   const { loading, dashboardData } = useSelector((state) => state.EmpAttendance);
 
   // Use dashboard data as source of truth (not Redux isPunchedIn)
-  const todayAttendance = dashboardData?.today_attendance || {};
-  const isActuallyPunchedIn = todayAttendance.punched_in === true && todayAttendance.punched_out !== true;
-  const punchInTimeFromApi = todayAttendance.punch_in_time;
-  const canPunch = dashboardData?.can_punch ?? true;
+  // const todayAttendance = dashboardData?.today_attendance || {};
+  // const isActuallyPunchedIn = todayAttendance.punched_in === true && todayAttendance.punched_out !== true;
+  // const punchInTimeFromApi = todayAttendance.punch_in_time;
+  // const canPunch = dashboardData?.can_punch ?? true;
 
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
-  const [showPunchOutModal, setShowPunchOutModal] = useState(false);
+  // const [showPunchOutModal, setShowPunchOutModal] = useState(false);
   const [toast, setToast] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // const [isSubmitting, setIsSubmitting] = useState(false);
   const chartRef = useRef(null);
 
   // Show toast notification
@@ -48,46 +49,46 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Handle Punch In/Out
-  const handlePunch = async () => {
-    if (!isActuallyPunchedIn) {
-      // Check if can punch in
-      if (!canPunch) {
-        showToastMessage("❌ You cannot punch in at this time", "error");
-        return;
-      }
-      
-      // Punch In
-      setIsSubmitting(true);
-      const result = await dispatch(punchIn());
-      setIsSubmitting(false);
+  // Handle Punch In/Out - Commented out
+  // const handlePunch = async () => {
+  //   if (!isActuallyPunchedIn) {
+  //     // Check if can punch in
+  //     if (!canPunch) {
+  //       showToastMessage("❌ You cannot punch in at this time", "error");
+  //       return;
+  //     }
+  //     
+  //     // Punch In
+  //     setIsSubmitting(true);
+  //     const result = await dispatch(punchIn());
+  //     setIsSubmitting(false);
+  //
+  //     if (punchIn.fulfilled.match(result)) {
+  //       showToastMessage("✅ Punched in successfully!", "success");
+  //       await dispatch(fetchDashboardData());
+  //     } else {
+  //       showToastMessage(result.payload || "❌ Punch in failed", "error");
+  //     }
+  //   } else {
+  //     // Open modal for Punch Out
+  //     setShowPunchOutModal(true);
+  //   }
+  // };
 
-      if (punchIn.fulfilled.match(result)) {
-        showToastMessage("✅ Punched in successfully!", "success");
-        await dispatch(fetchDashboardData());
-      } else {
-        showToastMessage(result.payload || "❌ Punch in failed", "error");
-      }
-    } else {
-      // Open modal for Punch Out
-      setShowPunchOutModal(true);
-    }
-  };
-
-  // Handle Punch Out Submit
-  const handlePunchOutSubmit = async (data) => {
-    setIsSubmitting(true);
-    const result = await dispatch(punchOut(data));
-    setIsSubmitting(false);
-
-    if (punchOut.fulfilled.match(result)) {
-      showToastMessage("✅ Punched out successfully!", "success");
-      setShowPunchOutModal(false);
-      await dispatch(fetchDashboardData());
-    } else {
-      showToastMessage(result.payload || "❌ Punch out failed", "error");
-    }
-  };
+  // Handle Punch Out Submit - Commented out
+  // const handlePunchOutSubmit = async (data) => {
+  //   setIsSubmitting(true);
+  //   const result = await dispatch(punchOut(data));
+  //   setIsSubmitting(false);
+  //
+  //   if (punchOut.fulfilled.match(result)) {
+  //     showToastMessage("✅ Punched out successfully!", "success");
+  //     setShowPunchOutModal(false);
+  //     await dispatch(fetchDashboardData());
+  //   } else {
+  //     showToastMessage(result.payload || "❌ Punch out failed", "error");
+  //   }
+  // };
 
   // Format punch time with proper timezone handling
   const formatPunchTime = (time) => {
@@ -225,43 +226,43 @@ const Dashboard = () => {
     return user?.role?.name || user?.role || 'Employee';
   };
 
-  // Determine if button should be disabled
-  const isButtonDisabled = () => {
-    if (loading || isSubmitting) return true;
-    
-    // If not punched in, check if can punch
-    if (!isActuallyPunchedIn && !canPunch) return true;
-    
-    return false;
-  };
+  // Determine if button should be disabled - Commented out
+  // const isButtonDisabled = () => {
+  //   if (loading || isSubmitting) return true;
+  //   
+  //   // If not punched in, check if can punch
+  //   if (!isActuallyPunchedIn && !canPunch) return true;
+  //   
+  //   return false;
+  // };
 
-  // Get button text
-  const getButtonText = () => {
-    if (loading || isSubmitting) return 'Processing...';
-    return isActuallyPunchedIn ? 'Punch Out' : 'Punch In';
-  };
+  // Get button text - Commented out
+  // const getButtonText = () => {
+  //   if (loading || isSubmitting) return 'Processing...';
+  //   return isActuallyPunchedIn ? 'Punch Out' : 'Punch In';
+  // };
 
-  // Get status display
-  const getStatusDisplay = () => {
-    if (isActuallyPunchedIn) {
-      return { text: 'Punched In ✓', color: 'text-green-500' };
-    }
-    if (todayAttendance.punched_out === true) {
-      return { text: 'Punched Out ✓', color: 'text-blue-500' };
-    }
-    return { text: 'Not Punched In', color: 'text-red-500' };
-  };
+  // Get status display - Commented out (optional: can keep for display but without punch functionality)
+  // const getStatusDisplay = () => {
+  //   if (isActuallyPunchedIn) {
+  //     return { text: 'Punched In ✓', color: 'text-green-500' };
+  //   }
+  //   if (todayAttendance.punched_out === true) {
+  //     return { text: 'Punched Out ✓', color: 'text-blue-500' };
+  //   }
+  //   return { text: 'Not Punched In', color: 'text-red-500' };
+  // };
 
-  const statusDisplay = getStatusDisplay();
-  const displayPunchTime = punchInTimeFromApi || todayAttendance.punch_in_time;
+  // const statusDisplay = getStatusDisplay();
+  // const displayPunchTime = punchInTimeFromApi || todayAttendance.punch_in_time;
 
-  // Debug log to see what time we're getting
-  useEffect(() => {
-    if (displayPunchTime) {
-      console.log("Raw punch time from API:", displayPunchTime);
-      console.log("Formatted punch time:", formatPunchTime(displayPunchTime));
-    }
-  }, [displayPunchTime]);
+  // Debug log - Commented out
+  // useEffect(() => {
+  //   if (displayPunchTime) {
+  //     console.log("Raw punch time from API:", displayPunchTime);
+  //     console.log("Formatted punch time:", formatPunchTime(displayPunchTime));
+  //   }
+  // }, [displayPunchTime]);
 
   return (
     <div>
@@ -282,8 +283,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Punch Card */}
-      <div className="punch-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 md:p-6 mb-7 flex flex-col md:flex-row justify-between items-center gap-5">
+      {/* Punch Card - Commented out or removed */}
+      {/* <div className="punch-card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 md:p-6 mb-7 flex flex-col md:flex-row justify-between items-center gap-5">
         <div className="punch-stats flex gap-8 md:gap-10 flex-wrap justify-center">
           <div className="punch-item text-center">
             <div className="punch-label text-xs text-[var(--muted)] mb-2">Today's Date</div>
@@ -313,7 +314,7 @@ const Dashboard = () => {
           <i className="fas fa-fingerprint"></i>
           {getButtonText()}
         </button>
-      </div>
+      </div> */}
 
       {/* Stats Grid */}
       <div className="stats-grid grid grid-cols-2 md:grid-cols-3 gap-5 mb-7">
@@ -357,7 +358,7 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Activity Section */}
-      {dashboardData?.attendance_history && dashboardData.attendance_history.length > 0 && (
+      {/* {dashboardData?.attendance_history && dashboardData.attendance_history.length > 0 && (
         <div className="recent-activity bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
           <h3 className="text-base font-semibold text-[var(--text)] mb-5 flex items-center gap-2">
             <i className="fas fa-history"></i> Recent Activity
@@ -396,15 +397,15 @@ const Dashboard = () => {
             </table>
           </div>
         </div>
-      )}
+      )} */}
 
-      {/* Punch Out Modal */}
-      <PunchOutModal
+      {/* Punch Out Modal - Commented out */}
+      {/* <PunchOutModal
         isOpen={showPunchOutModal}
         onClose={() => setShowPunchOutModal(false)}
         onSubmit={handlePunchOutSubmit}
         loading={isSubmitting}
-      />
+      /> */}
 
       {/* Toast Notification */}
       {toast && (
