@@ -925,6 +925,28 @@ const EmployeeDetails = () => {
                   </div>
                 </div>
 
+                {/* MOH License Number - Display in its own row below for Doctor/Nurse roles */}
+                {(() => {
+                  const roleName = getRoleName(currentEmployee.user?.role_id);
+                  const isDoctorOrNurse =
+                    roleName?.toLowerCase() === "doctor" ||
+                    roleName?.toLowerCase() === "nurse";
+                  return isDoctorOrNurse &&
+                    currentEmployee.moh_license_number ? (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="border-b border-gray-100 pb-3 md:col-span-2">
+                        <label className="text-xs text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                          <i className="fas fa-id-card text-green-500 mr-1"></i>{" "}
+                          MOH License Number
+                        </label>
+                        <p className="text-gray-800 font-medium mt-1">
+                          {currentEmployee.moh_license_number}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
                 {/* Special Days Section */}
                 <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-4 flex items-center gap-2">
                   <FiHeart className="text-green-500" /> Special Days

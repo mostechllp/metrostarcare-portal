@@ -247,6 +247,19 @@ const EditEmployee = () => {
     return dateString;
   };
 
+useEffect(() => {
+  if (formInitialized && roles.length > 0 && currentEmployee?.user?.role_id) {
+    const currentRoleValue = watch("role");
+    const expectedRoleValue = currentEmployee.user.role_id.toString();
+    
+    // If role is not set or doesn't match, set it again
+    if (currentRoleValue !== expectedRoleValue) {
+      console.log("Re-setting role to:", expectedRoleValue);
+      setValue("role", expectedRoleValue);
+    }
+  }
+}, [roles, formInitialized, currentEmployee, setValue, watch]);
+
   // Set form values when employee data is loaded
   useEffect(() => {
     if (currentEmployee && !formInitialized) {
@@ -377,7 +390,8 @@ const EditEmployee = () => {
         "home_country_number",
         currentEmployee.home_country_number || "",
       );
-      setValue("role", currentEmployee.user?.role_id || "");
+      const roleId = currentEmployee.user?.role_id;
+      setValue("role", roleId ? roleId.toString() : "");
       setValue("moh_license_number", currentEmployee.moh_license_number || "");
 
       // Set selected company details for trade license display
