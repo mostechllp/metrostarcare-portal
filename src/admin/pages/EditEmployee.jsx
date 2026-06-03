@@ -120,6 +120,7 @@ const EditEmployee = () => {
       other_number: "",
       home_country_number: "",
       role: "",
+      moh_license_number: "",
     },
     shouldUnregister: false,
     mode: "onChange",
@@ -142,6 +143,7 @@ const EditEmployee = () => {
   const laborExpiry = watch("labor_expiry_date");
   const eidIssued = watch("eid_issued_date");
   const eidExpiry = watch("eid_expiry_date");
+  const watchRole = watch("role");
 
   // Fetch initial data
   useEffect(() => {
@@ -376,6 +378,7 @@ const EditEmployee = () => {
         currentEmployee.home_country_number || "",
       );
       setValue("role", currentEmployee.user?.role_id || "");
+      setValue("moh_license_number", currentEmployee.moh_license_number || "");
 
       // Set selected company details for trade license display
       if (companyId && companies.length > 0) {
@@ -450,6 +453,13 @@ const EditEmployee = () => {
     { value: "other_visa", label: "Other Visa" },
   ];
 
+  const getMohLicenseRequired = (roleId) => {
+    if (!roleId) return false;
+    const selectedRole = roles.find((role) => role.id === parseInt(roleId));
+    const roleName = selectedRole?.name?.toLowerCase();
+    return roleName === "doctor" || roleName === "nurse";
+  };
+
   const getStepFields = (stepIndex) => {
     switch (stepIndex) {
       case 0: {
@@ -461,7 +471,19 @@ const EditEmployee = () => {
           "type",
           "dob",
           "joining_date",
+          "role",
         ];
+        // Add MOH license validation conditionally
+        const selectedRole = roles.find(
+          (role) => role.id === parseInt(watchRole),
+        );
+        if (
+          selectedRole?.name?.toLowerCase() === "doctor" ||
+          selectedRole?.name?.toLowerCase() === "nurse"
+        ) {
+          fields.push("moh_license_number");
+        }
+
         // Only add company_id to validation if multi_company is "Yes"
         if (selectedOrgDetails?.multi_company === "Yes") {
           fields.push("company_id");
@@ -471,7 +493,6 @@ const EditEmployee = () => {
       case 1:
         return ["passport_issued_date", "passport_expiry_date"];
       case 2: {
-
         return [
           "visa_type",
           "visa_number",
@@ -483,7 +504,7 @@ const EditEmployee = () => {
         ];
       }
       case 3:
-        return ["company_email", "personal_email", "type", "role"];
+        return ["company_email", "personal_email", "type"];
       default:
         return [];
     }
@@ -754,6 +775,8 @@ const EditEmployee = () => {
     if (data.home_country_number)
       formData.append("home_country_number", data.home_country_number);
     if (data.role) formData.append("role_id", data.role);
+    if (data.moh_license_number)
+      formData.append("moh_license_number", data.moh_license_number || "");
 
     // Avatar - send temp path if new file uploaded
     if (documents.avatar) {
@@ -840,6 +863,9 @@ const EditEmployee = () => {
     designation_id: { required: "Designation is required" },
     department_id: { required: "Department is required" },
     role: { required: "Role is required" },
+    moh_license_number: {
+      required: false,
+    },
     personal_email: {
       required: "Personal email is required",
       pattern: {
@@ -1525,6 +1551,104 @@ const EditEmployee = () => {
                     />
                   </div>
 
+                  {/* Role and MOH License Number  */}
+                  <div className="md:col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                      {/* Role Selection */}
+                      <div>
+                        <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
+                          <i className="fas fa-user-tag text-green-500 mr-1"></i>{" "}
+                          Role <span className="text-red-500">*</span>
+                        </label>
+                        <Controller
+                          name="role"
+                          control={control}
+                          rules={{ required: "Role is required" }}
+                          render={({ field }) => (
+                            <>
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                              >
+                                <option value="">Select Role</option>
+                                {roles.map((role) => (
+                                  <option
+                                    key={role.id}
+                                    value={role.id.toString()}
+                                  >
+                                    {role.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {errors.role && (
+                                <p className="mt-1 text-xs text-red-500">
+                                  {errors.role.message}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        />
+                      </div>
+
+                      {/* MOH License Number - Only shown and required for Doctor/Nurse roles */}
+                      {watchRole &&
+                        (() => {
+                          const selectedRole = roles.find(
+                            (role) => role.id === parseInt(watchRole),
+                          );
+                          const isDoctorOrNurse =
+                            selectedRole?.name?.toLowerCase() === "doctor" ||
+                            selectedRole?.name?.toLowerCase() === "nurse";
+                          return isDoctorOrNurse ? (
+                            <div>
+                              <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
+                                <i className="fas fa-id-card text-green-500 mr-1"></i>{" "}
+                                MOH License Number{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <Controller
+                                name="moh_license_number"
+                                control={control}
+                                rules={{
+                                  required:
+                                    "MOH License Number is required for doctors and nurses",
+                                  pattern: {
+                                    value: /^[A-Z0-9-]+$/i,
+                                    message:
+                                      "Please enter a valid license number",
+                                  },
+                                }}
+                                render={({ field }) => (
+                                  <>
+                                    <input
+                                      {...field}
+                                      type="text"
+                                      className={`w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border rounded-lg text-sm md:text-base text-gray-800 focus:outline-none focus:ring-2 ${errors.moh_license_number ? "border-red-500" : "border-gray-200 focus:border-green-500"}`}
+                                      placeholder="Enter MOH License Number (e.g., MOH-12345)"
+                                    />
+                                    {errors.moh_license_number && (
+                                      <p className="mt-1 text-xs text-red-500">
+                                        {errors.moh_license_number.message}
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      <i className="fas fa-info-circle mr-1"></i>
+                                      Required for medical professionals
+                                      (Doctors and Nurses)
+                                    </p>
+                                  </>
+                                )}
+                              />
+                            </div>
+                          ) : (
+                            /* Empty div to maintain layout when MOH License is not shown */
+                            <div></div>
+                          );
+                        })()}
+                    </div>
+                  </div>
+
                   {/* Special Days */}
                   <div className="md:col-span-2">
                     <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">
@@ -2037,7 +2161,7 @@ const EditEmployee = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                            Labor Number 
+                            Labor Number
                           </label>
                           <Controller
                             name="labor_number"
@@ -2465,37 +2589,6 @@ const EditEmployee = () => {
                               {errors.personal_email.message}
                             </p>
                           )}
-                        </>
-                      )}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <Controller
-                      name="role"
-                      control={control}
-                      rules={{ required: "Role is required" }}
-                      render={({ field }) => (
-                        <>
-                          <select
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              console.log("Role changed to:", e.target.value);
-                              field.onChange(e.target.value);
-                            }}
-                            className="w-full px-3 md:px-4 py-2 md:py-3 bg-gray-50 border border-gray-200 rounded-lg"
-                          >
-                            <option value="">Select Role</option>
-                            {roles.map((role) => (
-                              <option key={role.id} value={role.id.toString()}>
-                                {role.name}
-                              </option>
-                            ))}
-                          </select>
                         </>
                       )}
                     />
