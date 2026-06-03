@@ -7,7 +7,7 @@ import StatusBadge from '../components/common/StatusBadge';
 
 const Leaves = () => {
   const dispatch = useAppDispatch();
-  const leavesState = useAppSelector((state) => state.leaves);
+  const leavesState = useAppSelector((state) => state.EmpLeaves);
   
   // Add safety defaults
   const leaves = leavesState?.leaves || [];
