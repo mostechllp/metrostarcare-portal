@@ -141,16 +141,17 @@ const OffboardingInitiation = () => {
   }, [watchedNoticeStartDate, watchedLastWorkingDay, setValue]);
 
   // Filter employees based on search query (using real data from API)
-  const filteredEmployees = (employees || []).filter(emp => {
-    const employeeId = emp.id ? String(emp.id) : "";
-    const employeeName = emp.name ? String(emp.name).toLowerCase() : "";
-    const employeeEmail = emp.raw?.user?.email ? String(emp.raw.user.email).toLowerCase() : "";
-    const searchLower = searchQuery.toLowerCase();
-    
-    return employeeName.includes(searchLower) || 
-           employeeId.includes(searchLower) || 
-           employeeEmail.includes(searchLower);
-  });
+  // Filter employees based on search query (using real data from API)
+const filteredEmployees = (employees || []).filter(emp => {
+  const employeeId = emp.raw?.employee_id ? String(emp.raw.employee_id) : "";
+  const employeeName = emp.name ? String(emp.name).toLowerCase() : "";
+  const employeeEmail = emp.raw?.user?.email ? String(emp.raw.user.email).toLowerCase() : "";
+  const searchLower = searchQuery.toLowerCase();
+  
+  return employeeName.includes(searchLower) || 
+         employeeId.includes(searchLower) || 
+         employeeEmail.includes(searchLower);
+});
 
   // Filter managers based on search query
   const filteredManagers = STATIC_MANAGERS.filter(manager => {
@@ -165,35 +166,40 @@ const OffboardingInitiation = () => {
   });
 
   // Handle employee selection and auto-populate all form fields
-  const handleSelectEmployee = (emp) => {
-    setSearchQuery(emp.name);
-    setShowDropdown(false);
+  // Handle employee selection and auto-populate all form fields
+const handleSelectEmployee = (emp) => {
+  setSearchQuery(emp.name);
+  setShowDropdown(false);
 
-    const rawEmployee = emp.raw || {};
-    const userData = rawEmployee.user || {};
-    
-    // Find department name from department ID
-    const departmentObj = departments?.find(dept => dept.id === userData.department_id);
-    const departmentName = departmentObj?.name || userData.department?.name || "";
-    
-    // Find designation name from designation ID
-    const designationObj = designations?.find(des => des.id === userData.designation_id);
-    const designationName = designationObj?.name || userData.designation?.name || "";
+  const rawEmployee = emp.raw || {};
+  const userData = rawEmployee.user || {};
+  
+  // Find department name from department ID
+  const departmentObj = departments?.find(dept => dept.id === userData.department_id);
+  const departmentName = departmentObj?.name || userData.department?.name || "";
+  
+  // Find designation name from designation ID
+  const designationObj = designations?.find(des => des.id === userData.designation_id);
+  const designationName = designationObj?.name || userData.designation?.name || "";
 
-    // Set form fields with real data from API
-    setValue("employeeId", String(emp.id), { shouldValidate: true });
-    setValue("employeeName", emp.name, { shouldValidate: true });
-    setValue("department", departmentName, { shouldValidate: true });
-    setValue("designation", designationName, { shouldValidate: true });
-    setValue("nationality", rawEmployee.nationality || "", { shouldValidate: true });
-    setValue("email", userData.email || "", { shouldValidate: true });
-    
-    // Set default visa sponsorship based on employee data or leave empty
-    const visaStatus = rawEmployee.visa_status || rawEmployee.visa_sponsorship || "";
-    setValue("visaSponsorship", visaStatus, { shouldValidate: true });
+  // Set form fields with real data from API
+  // IMPORTANT: Get employee_id from raw.employee_id, not from emp.employee_id
+  const employeeIdValue = rawEmployee.employee_id || String(emp.id);
+  console.log("Setting employee ID to:", employeeIdValue); // Debug log
+  
+  setValue("employeeId", employeeIdValue, { shouldValidate: true });
+  setValue("employeeName", emp.name, { shouldValidate: true });
+  setValue("department", departmentName, { shouldValidate: true });
+  setValue("designation", designationName, { shouldValidate: true });
+  setValue("nationality", rawEmployee.nationality || "", { shouldValidate: true });
+  setValue("email", userData.email || "", { shouldValidate: true });
+  
+  // Set default visa sponsorship based on employee data or leave empty
+  const visaStatus = rawEmployee.visa_status || rawEmployee.visa_sponsorship || "";
+  setValue("visaSponsorship", visaStatus, { shouldValidate: true });
 
-    showToast(`Employee ${emp.name} loaded successfully!`, "success");
-  };
+  showToast(`Employee ${emp.name} loaded successfully!`, "success");
+};
 
   // Handle manager selection
   const handleSelectManager = (manager) => {
@@ -408,7 +414,7 @@ const OffboardingInitiation = () => {
                                 {emp.designation} • {emp.department}
                               </p>
                             </div>
-                            <span className="text-xs text-gray-400 font-mono">{emp.id}</span>
+                            <span className="text-xs text-gray-400 font-mono">{emp.raw?.employee_id || emp.id}</span>
                           </div>
                         </button>
                       ))
