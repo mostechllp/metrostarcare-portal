@@ -114,7 +114,7 @@ const LeaveTypeManagement = () => {
             </Link>
             <i className="fas fa-chevron-right text-gray-400 text-[10px] md:text-xs"></i>
             <span className="text-gray-500 dark:text-gray-400">
-              Leave Type Management
+              Leave Types
             </span>
           </div>
 

@@ -74,6 +74,7 @@ const AdminWFH = lazy(() => import("./admin/pages/WFH"));
 const Settings = lazy(() => import("./admin/pages/Settings"));
 const RoleManagement = lazy(() => import("./admin/pages/RoleManagement"));
 const AddPayroll = lazy(() => import("./admin/pages/AddPayroll"));
+const OnboardingInitalize = lazy(() => import("./admin/components/onboarding/Onboarding"));
 const Onboarding = lazy(() => import("./admin/pages/Onboarding"));
 const Offboarding = lazy(() => import("./admin/pages/Offboarding"));
 const OffboardingInitiation = lazy(() => import("./admin/components/offboarding/OffboardingInitiation"));
@@ -159,6 +160,7 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="employees" element={<Employees />} />
           <Route path="employees/add-employee" element={<AddEmployee />} />
+          <Route path="employees/onboarding-initiation" element={<OnboardingInitalize />} />
           <Route path="employees/onboarding" element={<Onboarding />} />
           <Route path="employees/offboarding" element={<Offboarding />} />
           <Route path="employees/offboarding-initiation" element={<OffboardingInitiation />} />

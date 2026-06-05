@@ -149,7 +149,7 @@ const AssetTypesManagement = () => {
       <div className="flex flex-wrap justify-between items-center mb-6">
         <div>
           <h2 className="text-lg md:text-2xl font-bold gradient-heading bg-clip-text text-transparent">
-            Asset Types Management
+            Asset Types
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Manage asset types
