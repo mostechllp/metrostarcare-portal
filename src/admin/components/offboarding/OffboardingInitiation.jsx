@@ -414,7 +414,6 @@ const handleSelectEmployee = (emp) => {
                                 {emp.designation} • {emp.department}
                               </p>
                             </div>
-                            <span className="text-xs text-gray-400 font-mono">{emp.raw?.employee_id || emp.id}</span>
                           </div>
                         </button>
                       ))
