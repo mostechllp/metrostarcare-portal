@@ -14,6 +14,8 @@ import departmentReducer from "../admin/store/slices/departmentSlice";
 import documentsReducer from "../admin/store/slices/documentsSlice";
 import wfhReducer from "../admin/store/slices/wfhSlice";
 import onboardingReducer from "../admin/store/slices/onboardingSlice";
+import offboardingReducer from "../admin/store/slices/offboardingSlice";
+import assetReducer from "../admin/store/slices/assetSlice";
 import roleReducer from "../admin/store/slices/roleSlice";
 import settingsReducer from "../admin/store/slices/settingsSlice";
 
@@ -44,8 +46,11 @@ export const store = configureStore({
     documents: documentsReducer,
     wfh: wfhReducer,
     onboarding: onboardingReducer,
+    offboarding: offboardingReducer,
+    assets: assetReducer,
     roles: roleReducer,
     settings: settingsReducer,
+
 
     // Employee
     EmpLeaves: leavesReducer,
