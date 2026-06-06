@@ -1,62 +1,198 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { 
-  ClipboardList, Package, UserPlus, ArrowRight, 
-  CheckCircle2, Clock, AlertCircle, TrendingUp,
-  Users, Laptop, FileText, ShieldCheck, Briefcase,
-  Calendar, UserCheck, Timer, DollarSign
+import {
+  ClipboardList,
+  Package,
+  UserPlus,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+  Users,
+  Laptop,
+  FileText,
+  ShieldCheck,
+  Briefcase,
+  Calendar,
+  UserCheck,
+  Timer,
+  DollarSign,
+  Loader,
 } from "lucide-react";
 import { showToast } from "../../components/common/Toast";
 import { fetchEmployees } from "../store/slices/employeeSlice";
+import { fetchAllOffboarding, fetchOffboardingProgress } from "../store/slices/offboardingSlice";
+
+// Helper function to get step name
+const getStepName = (stepKey) => {
+  const stepMap = {
+    "initiation": "Initiation",
+    "visa_cancellation": "Visa Cancellation",
+    "checklist": "General Checklist",
+    "assets": "Asset Return",
+    "exit_interview": "Exit Interview",
+    "settlement": "Final Settlement",
+    "letters": "Letters & Documents",
+  };
+  return stepMap[stepKey] || stepKey || "Unknown";
+};
+
+const getStepIcon = (stepKey) => {
+  switch (stepKey) {
+    case "initiation":
+      return <UserPlus size={14} />;
+    case "visa_cancellation":
+      return <ShieldCheck size={14} />;
+    case "checklist":
+      return <ClipboardList size={14} />;
+    case "assets":
+      return <Package size={14} />;
+    case "exit_interview":
+      return <MessageSquareIcon size={14} />;
+    case "settlement":
+      return <DollarSign size={14} />;
+    case "letters":
+      return <FileText size={14} />;
+    default:
+      return <Timer size={14} />;
+  }
+};
+
+const MessageSquareIcon = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
 
 const OffboardingDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
-  // State for statistics (to be replaced with real API data)
+
   const [stats, setStats] = useState({
     activeOffboarding: 0,
     pendingTasks: 0,
     completedThisMonth: 0,
-    assetsToCollect: 0
+    assetsToCollect: 0,
   });
 
   const [recentOffboarding, setRecentOffboarding] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [progressData, setProgressData] = useState({});
 
-  // Redux state
+  const { categories } = useSelector((state) => state.checklistCategory);
+  const { offboardings, loading: offboardingLoading } = useSelector((state) => state.offboarding);
   const { employees, loading: employeesLoading } = useSelector((state) => state.employees);
 
+  // Build employee lookup map
+  const employeeMap = React.useMemo(() => {
+    const map = new Map();
+    if (employees && employees.length > 0) {
+      employees.forEach(emp => {
+        // Store by both id and employee_id
+        map.set(String(emp.id), emp);
+        if (emp.employee_id) {
+          map.set(String(emp.employee_id), emp);
+        }
+        if (emp.raw?.employee_id) {
+          map.set(String(emp.raw.employee_id), emp);
+        }
+      });
+    }
+    return map;
+  }, [employees]);
+
+  // Fetch employees and offboarding data
   useEffect(() => {
-    // Fetch employees and calculate stats
     dispatch(fetchEmployees());
+    dispatch(fetchAllOffboarding({ page: 1, perPage: 50 }));
   }, [dispatch]);
 
+  // Fetch progress for each offboarding record
   useEffect(() => {
-    if (!employeesLoading && employees) {
-      // Calculate real stats based on employee data
-      // This is mock logic - replace with actual offboarding data from API
-      const activeCount = employees.filter(emp => emp.status === "Inactive" || emp.status === "inactive").length;
-      const completedCount = employees.filter(emp => emp.status === "Completed").length;
+    const fetchProgressForAll = async () => {
+      if (offboardings && offboardings.length > 0) {
+        const progressMap = {};
+        for (const offboarding of offboardings) {
+          try {
+            const result = await dispatch(fetchOffboardingProgress(offboarding.id)).unwrap();
+            if (result) {
+              progressMap[offboarding.id] = result;
+            }
+          } catch (error) {
+            console.error(`Failed to fetch progress for offboarding ${offboarding.id}:`, error);
+          }
+        }
+        setProgressData(progressMap);
+      }
+    };
+    
+    fetchProgressForAll();
+  }, [offboardings, dispatch]);
+
+  // Process offboarding data
+  useEffect(() => {
+    if (!offboardingLoading && offboardings) {
+      // Calculate stats
+      const activeCount = offboardings.filter(
+        (off) => off.status !== "completed" && off.status !== "cancelled"
+      ).length;
       
+      const completedCount = offboardings.filter(
+        (off) => off.status === "completed"
+      ).length;
+
       setStats({
-        activeOffboarding: activeCount || 3,
-        pendingTasks: 12,
-        completedThisMonth: completedCount || 8,
-        assetsToCollect: 5
+        activeOffboarding: activeCount,
+        pendingTasks: activeCount * 3,
+        completedThisMonth: completedCount,
+        assetsToCollect: activeCount * 2,
       });
 
-      // Mock recent offboarding data - replace with real API data
-      setRecentOffboarding([
-        { id: 1, name: "Khalid Al Mansouri", employeeId: "EMP-0088", department: "Operations", lastDay: "2026-06-30", status: "in-progress", step: "Visa Cancellation" },
-        { id: 2, name: "Aisha bint Fahad", employeeId: "EMP-0102", department: "Human Resources", lastDay: "2026-07-15", status: "initiated", step: "Initiation" },
-        { id: 3, name: "Rahul Sharma", employeeId: "EMP-0145", department: "IT", lastDay: "2026-06-20", status: "in-progress", step: "Checklist" }
-      ]);
+      // Format recent offboarding data with employee names
+      const formattedOffboardings = offboardings.map(off => {
+        // Try to find employee by various ID fields
+        let employee = null;
+        if (off.employee_id) {
+          employee = employeeMap.get(String(off.employee_id));
+        }
+        
+        // Get employee name from employee data or fallback to offboarding data
+        let employeeName = "Unknown Employee";
+        if (employee) {
+          employeeName = employee.name || `${employee.first_name} ${employee.last_name}`;
+        } else if (off.employee_name) {
+          employeeName = off.employee_name;
+        }
+        
+        // Get department
+        let department = off.department || "-";
+        if (employee && employee.department) {
+          department = employee.department;
+        }
+        
+        const progress = progressData[off.id];
+        
+        return {
+          id: off.id,
+          name: employeeName,
+          employeeId: off.employee_id,
+          department: department,
+          lastDay: off.last_working_day,
+          status: off.status,
+          currentStep: off.current_step || "initiation",
+          progressPercentage: progress?.progress_percentage || 0,
+          completedSteps: progress?.completed_steps || 0,
+          totalSteps: progress?.total_steps || 7,
+          steps: progress?.steps || [],
+        };
+      });
       
+      setRecentOffboarding(formattedOffboardings);
       setLoading(false);
     }
-  }, [employees, employeesLoading]);
+  }, [offboardings, offboardingLoading, employeeMap, progressData]);
 
   const offboardingCards = [
     {
@@ -69,86 +205,119 @@ const OffboardingDashboard = () => {
       bgClass: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400",
       buttonClass: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50",
       stats: "Start new process",
-      buttonText: "Initiate Now"
+      buttonText: "Initiate Now",
     },
     {
-      id: "checklist",
-      title: "Offboarding Checklist",
-      description: "Create and manage offboarding checklists. Assign tasks to departments like HR, IT, Finance, and PRO.",
+      id: "categories",
+      title: "Checklist Categories",
+      description: "Manage offboarding checklist categories. Create, edit, and organize tasks by categories.",
       icon: <ClipboardList size={28} />,
-      path: "/admin/employees/offboarding-checklist-manager",
+      path: "/admin/employees/checklist-categories",
       color: "green",
       bgClass: "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400",
       buttonClass: "bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50",
-      stats: `${stats.pendingTasks} pending tasks`,
-      buttonText: "Manage Checklist"
+      stats: `${categories?.length || 0} categories`,
+      buttonText: "Manage Categories",
     },
   ];
 
   const quickStats = [
-    { 
-      label: "Active Offboarding", 
-      value: stats.activeOffboarding, 
-      icon: <Briefcase size={20} />, 
+    {
+      label: "Active Offboarding",
+      value: stats.activeOffboarding,
+      icon: <Briefcase size={20} />,
       color: "blue",
       bgClass: "bg-blue-100 dark:bg-blue-900/30",
-      textClass: "text-blue-600 dark:text-blue-400"
+      textClass: "text-blue-600 dark:text-blue-400",
     },
-    { 
-      label: "Pending Tasks", 
-      value: stats.pendingTasks, 
-      icon: <Clock size={20} />, 
+    {
+      label: "Pending Tasks",
+      value: stats.pendingTasks,
+      icon: <Clock size={20} />,
       color: "orange",
       bgClass: "bg-orange-100 dark:bg-orange-900/30",
-      textClass: "text-orange-600 dark:text-orange-400"
+      textClass: "text-orange-600 dark:text-orange-400",
     },
-    { 
-      label: "Completed (Month)", 
-      value: stats.completedThisMonth, 
-      icon: <CheckCircle2 size={20} />, 
+    {
+      label: "Completed (Month)",
+      value: stats.completedThisMonth,
+      icon: <CheckCircle2 size={20} />,
       color: "green",
       bgClass: "bg-green-100 dark:bg-green-900/30",
-      textClass: "text-green-600 dark:text-green-400"
+      textClass: "text-green-600 dark:text-green-400",
     },
-    { 
-      label: "Assets Pending", 
-      value: stats.assetsToCollect, 
-      icon: <Laptop size={20} />, 
+    {
+      label: "Assets Pending",
+      value: stats.assetsToCollect,
+      icon: <Laptop size={20} />,
       color: "purple",
       bgClass: "bg-purple-100 dark:bg-purple-900/30",
-      textClass: "text-purple-600 dark:text-purple-400"
-    }
+      textClass: "text-purple-600 dark:text-purple-400",
+    },
   ];
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case "initiated": return "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
-      case "in-progress": return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
-      case "completed": return "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400";
-      default: return "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400";
+    switch (status) {
+      case "initiated":
+        return "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
+      case "in-progress":
+      case "pending_visa":
+      case "pending_checklist":
+      case "pending_assets":
+      case "pending_interview":
+      case "pending_settlement":
+      case "pending_letters":
+        return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
+      case "completed":
+        return "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400";
+      default:
+        return "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400";
     }
   };
 
-  const getStepIcon = (step) => {
-    switch(step) {
-      case "Initiation": return <UserPlus size={14} />;
-      case "Visa Cancellation": return <ShieldCheck size={14} />;
-      case "Checklist": return <ClipboardList size={14} />;
-      default: return <Timer size={14} />;
-    }
+  const getStatusLabel = (status) => {
+    if (status === "initiated") return "Initiated";
+    if (status === "in-progress") return "In Progress";
+    if (status === "pending_visa") return "Visa Pending";
+    if (status === "pending_checklist") return "Checklist Pending";
+    if (status === "pending_assets") return "Assets Pending";
+    if (status === "pending_interview") return "Interview Pending";
+    if (status === "pending_settlement") return "Settlement Pending";
+    if (status === "pending_letters") return "Letters Pending";
+    if (status === "completed") return "Completed";
+    return status || "Unknown";
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'Not set';
+    if (!dateStr) return "Not set";
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
   };
 
-  if (loading) {
+  const handleContinue = (offboarding) => {
+    const step = offboarding.currentStep;
+    if (step === "initiation" || step === "initiated") {
+      navigate(`/admin/employees/offboarding-initiation?id=${offboarding.id}`);
+    } else if (step === "visa_cancellation") {
+      navigate(`/admin/employees/visa-cancellation?id=${offboarding.id}`);
+    } else if (step === "checklist") {
+      navigate(`/admin/employees/offboarding-checklist?id=${offboarding.id}`);
+    } else if (step === "assets") {
+      navigate(`/admin/employees/asset-return?id=${offboarding.id}`);
+    } else if (step === "exit_interview") {
+      navigate(`/admin/employees/exit-interview?id=${offboarding.id}`);
+    } else if (step === "settlement") {
+      navigate(`/admin/employees/final-settlement?id=${offboarding.id}`);
+    } else if (step === "letters") {
+      navigate(`/admin/employees/letters-and-clearance?id=${offboarding.id}`);
+    }
+  };
+
+  if (loading || offboardingLoading) {
     return (
       <div className="w-full overflow-x-hidden">
         <div className="flex items-center justify-center h-64">
@@ -160,8 +329,6 @@ const OffboardingDashboard = () => {
 
   return (
     <div className="w-full overflow-x-hidden">
-
-        
       {/* Stats Cards */}
       <div className="stats-grid grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-5 mb-6">
         {quickStats.map((stat, index) => (
@@ -183,13 +350,13 @@ const OffboardingDashboard = () => {
           </div>
         ))}
       </div>
+
       {/* Page Header */}
       <div className="mb-6">
         <h2 className="text-lg md:text-2xl font-bold gradient-heading bg-clip-text text-transparent">
           Offboarding
         </h2>
       </div>
-
 
       {/* Main Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-8">
@@ -200,20 +367,15 @@ const OffboardingDashboard = () => {
             onClick={() => navigate(card.path)}
           >
             <div className="p-4 md:p-6">
-              {/* Icon */}
               <div className={`w-12 h-12 md:w-14 md:h-14 ${card.bgClass} rounded-xl flex items-center justify-center mb-3 md:mb-4`}>
                 {card.icon}
               </div>
-              
-              {/* Title & Description */}
               <h3 className="text-base md:text-xl font-bold text-gray-900 dark:text-white mb-1 md:mb-2">
                 {card.title}
               </h3>
               <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-3 md:mb-4">
                 {card.description}
               </p>
-              
-              {/* Stats Badge */}
               <div className="flex items-center justify-between mt-3 md:mt-4 pt-3 md:pt-4 border-t border-gray-100 dark:border-gray-700">
                 <span className="text-[10px] md:text-xs font-semibold text-gray-400 uppercase tracking-wide">
                   {card.stats}
@@ -235,7 +397,7 @@ const OffboardingDashboard = () => {
       </div>
 
       {/* Recent Offboarding Section */}
-      {/* <div className="mt-6 md:mt-8">
+      <div className="mt-6 md:mt-8">
         <div className="flex flex-wrap justify-between items-center mb-4 md:mb-5">
           <h2 className="text-sm md:text-base font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
             <FileText size={18} className="text-gray-500" />
@@ -251,7 +413,7 @@ const OffboardingDashboard = () => {
         </div>
         
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto shadow-soft">
-          <div className="min-w-[800px] md:min-w-0">
+          <div className="min-w-[900px] md:min-w-0">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
@@ -260,6 +422,7 @@ const OffboardingDashboard = () => {
                   <th className="px-3 md:px-4 py-2 md:py-3 text-left text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Department</th>
                   <th className="px-3 md:px-4 py-2 md:py-3 text-left text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Last Working Day</th>
                   <th className="px-3 md:px-4 py-2 md:py-3 text-left text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Current Step</th>
+                  <th className="px-3 md:px-4 py-2 md:py-3 text-left text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Progress</th>
                   <th className="px-3 md:px-4 py-2 md:py-3 text-left text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Status</th>
                   <th className="px-3 md:px-4 py-2 md:py-3 text-right text-[10px] md:text-xs font-semibold text-gray-500 dark:text-gray-400">Action</th>
                 </tr>
@@ -274,7 +437,7 @@ const OffboardingDashboard = () => {
                       <td className="px-3 md:px-4 py-2 md:py-3">
                         <div>
                           <p className="text-xs md:text-sm font-semibold text-gray-800 dark:text-gray-200">{item.name}</p>
-                          <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">{item.employeeId}</p>
+                          <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">ID: {item.employeeId}</p>
                         </div>
                       </td>
                       <td className="px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-gray-600 dark:text-gray-400">
@@ -290,28 +453,34 @@ const OffboardingDashboard = () => {
                       </td>
                       <td className="px-3 md:px-4 py-2 md:py-3">
                         <div className="flex items-center gap-1 md:gap-2">
-                          {getStepIcon(item.step)}
+                          {getStepIcon(item.currentStep)}
                           <span className="text-xs md:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                            {item.step}
+                            {getStepName(item.currentStep)}
                           </span>
                         </div>
                       </td>
                       <td className="px-3 md:px-4 py-2 md:py-3">
+                        <div className="flex flex-col gap-1 min-w-[100px]">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-gray-500">{item.completedSteps}/{item.totalSteps}</span>
+                            <span className="text-green-600">{item.progressPercentage}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-green-500 transition-all duration-300" 
+                              style={{ width: `${item.progressPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 md:px-4 py-2 md:py-3">
                         <span className={`inline-flex px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-semibold ${getStatusColor(item.status)} whitespace-nowrap`}>
-                          {item.status === "initiated" ? "Initiated" : "In Progress"}
+                          {getStatusLabel(item.status)}
                         </span>
                       </td>
                       <td className="px-3 md:px-4 py-2 md:py-3 text-right">
                         <button
-                          onClick={() => {
-                            if (item.step === "Initiation") {
-                              navigate("/admin/employees/offboarding-initiation");
-                            } else if (item.step === "Visa Cancellation") {
-                              navigate("/admin/employees/visa-cancellation");
-                            } else if (item.step === "Checklist") {
-                              navigate("/admin/employees/offboarding-checklist");
-                            }
-                          }}
+                          onClick={() => handleContinue(item)}
                           className="text-xs md:text-sm font-semibold text-green-600 dark:text-green-400 hover:text-green-700 flex items-center gap-1 ml-auto"
                         >
                           Continue
@@ -322,16 +491,16 @@ const OffboardingDashboard = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="8" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                       No offboarding requests found.
                     </td>
-                  </tr>
+                   </tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
-      </div> */}
+      </div>
 
       {/* Quick Tips Section */}
       <div className="mt-6 p-3 md:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">

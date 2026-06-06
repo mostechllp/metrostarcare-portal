@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Info, Check, X, Calculator, ArrowRight, DollarSign, Loader } from "lucide-react";
+import { Info, Check, X, ArrowRight, DollarSign, Loader, Plus, Edit, Trash2, Save } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { showToast } from "../common/Toast";
 import OffboardingHeader from "./OffboardingHeader";
-import { fetchOffboardingById, updateSettlement } from "../../store/slices/offboardingSlice";
+import { fetchOffboardingById, updateSettlement, fetchOffboardingProgress } from "../../store/slices/offboardingSlice";
 import { fetchEmployeeById } from "../../store/slices/employeeSlice";
+import ConfirmModal from "../common/ConfirmModal";
+import apiClient from "../../../utils/apiClient";
 
 const FinalSettlement = () => {
   const navigate = useNavigate();
@@ -16,15 +18,15 @@ const FinalSettlement = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
+  const [employeeData, setEmployeeData] = useState(null);
+  const [salaryComponents, setSalaryComponents] = useState([]);
+  const [editingComponent, setEditingComponent] = useState(null);
+  const [showAddComponent, setShowAddComponent] = useState(false);
+  const [newComponent, setNewComponent] = useState({
+    component_name: "",
+    value: ""
+  });
   const [settlementData, setSettlementData] = useState({
-    yearsOfService: 0,
-    monthsOfService: 0,
-    basicSalary: 0,
-    gratuity: 0,
-    pendingSalary: 0,
-    housingAllowance: 0,
-    transportAllowance: 0,
-    leaveEncashment: 0,
     loanRecovery: 0,
     noticeShortfall: 0,
     otherDeductions: 0,
@@ -35,18 +37,28 @@ const FinalSettlement = () => {
     approvedAt: null
   });
   
+  // Confirm Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    componentId: null,
+    componentName: "",
+    loading: false
+  });
+  
   // Redux state
-  const { currentOffboarding, loading: offboardingLoading } = useSelector((state) => state.offboarding);
+  const { currentOffboarding, loading: offboardingLoading, currentProgress } = useSelector((state) => state.offboarding);
   const { currentEmployee } = useSelector((state) => state.employees);
 
   // Fetch offboarding details on component mount
   useEffect(() => {
     if (offboardingId) {
       dispatch(fetchOffboardingById(offboardingId));
+      dispatch(fetchOffboardingProgress(offboardingId));
     } else {
       const storedOffboardingId = localStorage.getItem("offboarding_id");
       if (storedOffboardingId) {
         dispatch(fetchOffboardingById(storedOffboardingId));
+        dispatch(fetchOffboardingProgress(storedOffboardingId));
       } else {
         setLoading(false);
         showToast("No offboarding session found. Please start from initiation.", "warning");
@@ -54,27 +66,24 @@ const FinalSettlement = () => {
     }
   }, [dispatch, offboardingId]);
 
+  // Fetch employee data
+  useEffect(() => {
+    if (currentOffboarding && currentOffboarding.employee_id) {
+      dispatch(fetchEmployeeById(currentOffboarding.employee_id));
+    }
+  }, [currentOffboarding, dispatch]);
+
   // Load settlement data from API
   useEffect(() => {
     if (currentOffboarding && !offboardingLoading) {
       // Load employee name
       if (currentOffboarding.employee_name) {
         setEmployeeName(currentOffboarding.employee_name);
-      } else if (currentOffboarding.employee_id) {
-        dispatch(fetchEmployeeById(currentOffboarding.employee_id));
       }
       
       // Load settlement data from API if available
       if (currentOffboarding.settlement) {
         setSettlementData({
-          yearsOfService: currentOffboarding.settlement.years_of_service || 0,
-          monthsOfService: currentOffboarding.settlement.months_of_service || 0,
-          basicSalary: currentOffboarding.settlement.basic_salary || 0,
-          gratuity: currentOffboarding.settlement.gratuity || 0,
-          pendingSalary: currentOffboarding.settlement.pending_salary || 0,
-          housingAllowance: currentOffboarding.settlement.housing_allowance || 0,
-          transportAllowance: currentOffboarding.settlement.transport_allowance || 0,
-          leaveEncashment: currentOffboarding.settlement.leave_encashment || 0,
           loanRecovery: currentOffboarding.settlement.loan_recovery || 0,
           noticeShortfall: currentOffboarding.settlement.notice_shortfall || 0,
           otherDeductions: currentOffboarding.settlement.other_deductions || 0,
@@ -84,98 +93,222 @@ const FinalSettlement = () => {
           approvedBy: currentOffboarding.settlement.approved_by || null,
           approvedAt: currentOffboarding.settlement.approved_at || null
         });
-      } else {
-        // Calculate settlement based on employee data
-        calculateSettlement(currentOffboarding);
       }
       
       setLoading(false);
     }
-  }, [currentOffboarding, offboardingLoading, dispatch]);
+  }, [currentOffboarding, offboardingLoading]);
 
-  // Update employee name when fetched
+  // Load salary components from employee data
   useEffect(() => {
     if (currentEmployee) {
       setEmployeeName(`${currentEmployee.first_name} ${currentEmployee.last_name}`);
+      setEmployeeData(currentEmployee);
       
-      // If we have employee data but no settlement, calculate
-      if (currentOffboarding && !currentOffboarding.settlement) {
-        calculateSettlement(currentOffboarding);
+      // Load salary components
+      if (currentEmployee.salary_components && currentEmployee.salary_components.length > 0) {
+        setSalaryComponents(currentEmployee.salary_components);
       }
     }
-  }, [currentEmployee, currentOffboarding]);
+  }, [currentEmployee]);
 
-  // Calculate settlement based on employee data
-  const calculateSettlement = (offboarding) => {
-    // Get basic salary from employee data or offboarding data
-    const basicSalary = offboarding.basic_salary || 8000;
-    const joiningDate = offboarding.joining_date || "2021-02-15";
-    const lastWorkingDay = offboarding.last_working_day || new Date().toISOString().split('T')[0];
+  // Calculate net payable whenever components or deductions change
+  useEffect(() => {
+    const totalSalary = salaryComponents.reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+    const totalDeductions = settlementData.loanRecovery + settlementData.noticeShortfall + settlementData.otherDeductions;
+    const netPayable = totalSalary - totalDeductions + settlementData.otherAdditions;
     
-    // Calculate years of service
-    const join = new Date(joiningDate);
-    const end = new Date(lastWorkingDay);
-    let years = end.getFullYear() - join.getFullYear();
-    let months = end.getMonth() - join.getMonth();
-    if (months < 0) {
-      years--;
-      months += 12;
-    }
-    
-    // Calculate gratuity based on UAE labor law
-    let gratuity = 0;
-    if (years >= 1 && years <= 5) {
-      // 21 days per year for first 5 years
-      gratuity = (basicSalary / 30) * 21 * years;
-      // Add remaining months
-      if (months > 0) {
-        gratuity += (basicSalary / 30) * 21 * (months / 12);
-      }
-    } else if (years > 5) {
-      // First 5 years: 21 days per year
-      gratuity = (basicSalary / 30) * 21 * 5;
-      // Remaining years: 30 days per year
-      const remainingYears = years - 5;
-      gratuity += (basicSalary / 30) * 30 * remainingYears;
-      // Add remaining months
-      if (months > 0) {
-        gratuity += (basicSalary / 30) * 30 * (months / 12);
-      }
-    }
-    
-    // Calculate pending salary (assuming last month)
-    const pendingSalary = basicSalary;
-    
-    // Calculate allowances
-    const housingAllowance = basicSalary * 0.25;
-    const transportAllowance = basicSalary * 0.1;
-    
-    // Calculate leave encashment (assuming 8 days unused leave)
-    const leaveEncashment = (basicSalary / 30) * 8;
-    
-    // Calculate net payable
-    const totalEarnings = pendingSalary + housingAllowance + transportAllowance + gratuity + leaveEncashment;
-    const totalDeductions = 0; // Add deductions if any
-    const netPayable = totalEarnings - totalDeductions;
-    
-    setSettlementData({
-      yearsOfService: years,
-      monthsOfService: months,
-      basicSalary: basicSalary,
-      gratuity: Math.round(gratuity),
-      pendingSalary: pendingSalary,
-      housingAllowance: Math.round(housingAllowance),
-      transportAllowance: Math.round(transportAllowance),
-      leaveEncashment: Math.round(leaveEncashment),
-      loanRecovery: 0,
-      noticeShortfall: 0,
-      otherDeductions: 0,
-      otherAdditions: 0,
-      netPayable: Math.round(netPayable),
-      status: "pending",
-      approvedBy: null,
-      approvedAt: null
+    setSettlementData(prev => ({
+      ...prev,
+      netPayable: Math.round(netPayable)
+    }));
+  }, [salaryComponents, settlementData.loanRecovery, settlementData.noticeShortfall, settlementData.otherDeductions, settlementData.otherAdditions]);
+
+  // Show delete confirmation modal
+  const handleDeleteClick = (componentId, componentName) => {
+    setConfirmModal({
+      isOpen: true,
+      componentId: componentId,
+      componentName: componentName,
+      loading: false
     });
+  };
+
+  // Close confirm modal
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      componentId: null,
+      componentName: "",
+      loading: false
+    });
+  };
+
+  // Execute delete after confirmation
+  const executeDelete = async () => {
+    const { componentId, componentName } = confirmModal;
+    
+    setConfirmModal(prev => ({ ...prev, loading: true }));
+    
+    try {
+      // Get current components and filter out the deleted one
+      const updatedComponents = salaryComponents.filter(comp => comp.id !== componentId);
+      
+      // Calculate totals
+      const totalSalary = updatedComponents.reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Find basic salary component
+      const basicComponent = updatedComponents.find(comp =>
+        comp.component_name.toLowerCase().includes("basic")
+      );
+      
+      const basicSalary = basicComponent ? basicComponent.value : updatedComponents[0]?.value || "0";
+      const otherAllowance = updatedComponents
+        .filter(comp => !comp.component_name.toLowerCase().includes("basic"))
+        .reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Prepare payload for the working endpoint
+      const payload = {
+        user_id: currentEmployee.user_id || currentEmployee.user?.id,
+        basic_salary: basicSalary.toString(),
+        other_allowance: otherAllowance.toString(),
+        total_salary: totalSalary.toString(),
+        payment_cycle: currentEmployee.payment_cycle || "Monthly",
+        currency: currentEmployee.currency || "AED",
+        salary_components: updatedComponents
+      };
+      
+      const response = await apiClient.post("/admin/employees/onboard/salary", payload);
+      
+      if (response.data.status === "success") {
+        showToast(`Salary component "${componentName}" deleted successfully`, "success");
+        // Refresh employee data
+        dispatch(fetchEmployeeById(currentEmployee.id));
+        closeConfirmModal();
+      } else {
+        showToast(response.data.message || "Failed to delete salary component", "error");
+        setConfirmModal(prev => ({ ...prev, loading: false }));
+      }
+    } catch (error) {
+      console.error("Error deleting salary component:", error);
+      showToast(error.response?.data?.message || "Failed to delete salary component", "error");
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Salary Component CRUD Operations using the working endpoint pattern
+  const handleUpdateSalaryComponent = async (componentId, updatedData) => {
+    try {
+      // Get current components
+      const currentComponents = [...salaryComponents];
+      
+      // Find and update the component
+      const updatedComponents = currentComponents.map(comp => 
+        comp.id === componentId 
+          ? { ...comp, component_name: updatedData.component_name, value: updatedData.value }
+          : comp
+      );
+      
+      // Calculate totals
+      const totalSalary = updatedComponents.reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Find basic salary component
+      const basicComponent = updatedComponents.find(comp =>
+        comp.component_name.toLowerCase().includes("basic")
+      );
+      
+      const basicSalary = basicComponent ? basicComponent.value : updatedComponents[0]?.value || "0";
+      const otherAllowance = updatedComponents
+        .filter(comp => !comp.component_name.toLowerCase().includes("basic"))
+        .reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Prepare payload for the working endpoint
+      const payload = {
+        user_id: currentEmployee.user_id || currentEmployee.user?.id,
+        basic_salary: basicSalary.toString(),
+        other_allowance: otherAllowance.toString(),
+        total_salary: totalSalary.toString(),
+        payment_cycle: currentEmployee.payment_cycle || "Monthly",
+        currency: currentEmployee.currency || "AED",
+        salary_components: updatedComponents
+      };
+      
+      const response = await apiClient.post("/admin/employees/onboard/salary", payload);
+      
+      if (response.data.status === "success") {
+        showToast("Salary component updated successfully", "success");
+        setEditingComponent(null);
+        // Refresh employee data
+        dispatch(fetchEmployeeById(currentEmployee.id));
+      } else {
+        showToast(response.data.message || "Failed to update salary component", "error");
+      }
+    } catch (error) {
+      console.error("Error updating salary component:", error);
+      showToast(error.response?.data?.message || "Failed to update salary component", "error");
+    }
+  };
+
+  const handleAddSalaryComponent = async () => {
+    if (!newComponent.component_name || !newComponent.value) {
+      showToast("Please fill in all fields", "error");
+      return;
+    }
+
+    try {
+      // Get current components and add new one
+      const currentComponents = salaryComponents || [];
+      const updatedComponents = [
+        ...currentComponents,
+        {
+          id: Date.now(), // Temporary ID
+          component_name: newComponent.component_name,
+          value: parseFloat(newComponent.value).toFixed(2)
+        }
+      ];
+      
+      // Calculate totals
+      const totalSalary = updatedComponents.reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Find basic salary component
+      const basicComponent = updatedComponents.find(comp =>
+        comp.component_name.toLowerCase().includes("basic")
+      );
+      
+      const basicSalary = basicComponent ? basicComponent.value : updatedComponents[0]?.value || "0";
+      const otherAllowance = updatedComponents
+        .filter(comp => !comp.component_name.toLowerCase().includes("basic"))
+        .reduce((sum, comp) => sum + parseFloat(comp.value), 0);
+      
+      // Prepare payload for the working endpoint (same as in EmployeeDetails)
+      const payload = {
+        user_id: currentEmployee.user_id || currentEmployee.user?.id,
+        basic_salary: basicSalary.toString(),
+        other_allowance: otherAllowance.toString(),
+        total_salary: totalSalary.toString(),
+        payment_cycle: currentEmployee.payment_cycle || "Monthly",
+        currency: currentEmployee.currency || "AED",
+        salary_components: updatedComponents.map(comp => ({
+          component_name: comp.component_name,
+          value: comp.value.toString()
+        }))
+      };
+      
+      const response = await apiClient.post("/admin/employees/onboard/salary", payload);
+      
+      if (response.data.status === "success") {
+        showToast("Salary component added successfully", "success");
+        setShowAddComponent(false);
+        setNewComponent({ component_name: "", value: "" });
+        // Refresh employee data
+        dispatch(fetchEmployeeById(currentEmployee.id));
+      } else {
+        showToast(response.data.message || "Failed to add salary component", "error");
+      }
+    } catch (error) {
+      console.error("Error adding salary component:", error);
+      showToast(error.response?.data?.message || "Failed to add salary component", "error");
+    }
   };
 
   const handleApprove = async () => {
@@ -185,14 +318,6 @@ const FinalSettlement = () => {
       // Prepare settlement payload
       const settlementPayload = {
         settlement: {
-          years_of_service: settlementData.yearsOfService,
-          months_of_service: settlementData.monthsOfService,
-          basic_salary: settlementData.basicSalary,
-          gratuity: settlementData.gratuity,
-          pending_salary: settlementData.pendingSalary,
-          housing_allowance: settlementData.housingAllowance,
-          transport_allowance: settlementData.transportAllowance,
-          leave_encashment: settlementData.leaveEncashment,
           loan_recovery: settlementData.loanRecovery,
           notice_shortfall: settlementData.noticeShortfall,
           other_deductions: settlementData.otherDeductions,
@@ -200,7 +325,8 @@ const FinalSettlement = () => {
           net_payable: settlementData.netPayable,
           status: "approved",
           approved_by: "admin",
-          approved_at: new Date().toISOString()
+          approved_at: new Date().toISOString(),
+          salary_components: salaryComponents
         }
       };
 
@@ -211,7 +337,9 @@ const FinalSettlement = () => {
       })).unwrap();
 
       console.log("Settlement approved:", result);
-;
+      
+      // Refresh progress after approving settlement
+      await dispatch(fetchOffboardingProgress(offboardingId || localStorage.getItem("offboarding_id")));
 
       showToast("Final settlement approved successfully", "success");
       
@@ -230,7 +358,6 @@ const FinalSettlement = () => {
     setIsSubmitting(true);
     
     try {
-      // Prepare rejection payload
       const rejectionPayload = {
         settlement: {
           ...settlementData,
@@ -240,7 +367,6 @@ const FinalSettlement = () => {
         }
       };
 
-      // Update settlement status via API
       await dispatch(updateSettlement({ 
         id: offboardingId || localStorage.getItem("offboarding_id"), 
         settlementData: rejectionPayload 
@@ -255,10 +381,19 @@ const FinalSettlement = () => {
     }
   };
 
+  // Calculate progress from API
+  const apiProgressPercentage = currentProgress?.progress_percentage || 0;
+  const completedStepsFromApi = currentProgress?.completed_steps || 0;
+  const totalStepsFromApi = currentProgress?.total_steps || 7;
+
   // Format currency
   const formatCurrency = (amount) => {
-    return `AED ${amount.toLocaleString()}`;
+    const currency = currentEmployee?.currency || "AED";
+    return `${currency} ${amount.toLocaleString()}`;
   };
+
+  // Get total salary
+  const totalSalary = salaryComponents.reduce((sum, comp) => sum + parseFloat(comp.value), 0);
 
   // Loading state
   if (loading || offboardingLoading) {
@@ -284,17 +419,6 @@ const FinalSettlement = () => {
         {/* SaaS Offboarding Header */}
         <OffboardingHeader currentStep={6} />
 
-        {/* Info Banner */}
-        <div className="bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 p-4 rounded-r-lg flex items-start gap-3 shadow-sm">
-          <Info className="text-blue-500 mt-0.5 flex-shrink-0" size={20} />
-          <div>
-            <h3 className="text-sm font-bold text-blue-800 dark:text-blue-400">Gratuity Guidelines</h3>
-            <p className="text-sm text-blue-700 dark:text-blue-500 mt-1 font-medium">
-              UAE gratuity: 21 days basic salary per year for first 5 years; 30 days per year thereafter. Prorated for partial years.
-            </p>
-          </div>
-        </div>
-
         {/* Main Content Card */}
         <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700/80 rounded-2xl shadow-soft p-6 sm:p-8 space-y-8">
           
@@ -302,7 +426,7 @@ const FinalSettlement = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-700 pb-6">
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                F&F settlement
+                Final Settlement
               </h1>
               <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">
                 {employeeName || "Employee"}
@@ -328,115 +452,292 @@ const FinalSettlement = () => {
             </div>
           </div>
 
-          {/* Gratuity Calculation Highlight Card */}
+          {/* Overall Progress Section */}
+          <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900/30 rounded-xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Offboarding Progress
+              </h3>
+              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                {apiProgressPercentage}%
+              </span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-green-500 transition-all duration-500"
+                style={{ width: `${apiProgressPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>Completed Steps: {completedStepsFromApi}</span>
+              <span>Total Steps: {totalStepsFromApi}</span>
+            </div>
+          </div>
+
+          {/* Salary Components Section */}
           <section className="space-y-4">
-            <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <Calculator size={16} />
-              Gratuity Calculation
-            </h2>
-            
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 dark:divide-gray-700">
-                
-                <div className="flex flex-col items-center justify-center text-center px-4 pt-4 sm:pt-0 first:pt-0">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Years of service</span>
-                  <div className="text-xl font-black text-gray-900 dark:text-white">
-                    {settlementData.yearsOfService} yrs {settlementData.monthsOfService} mo
-                  </div>
-                </div>
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <DollarSign size={16} />
+                Salary Components
+              </h2>
+              <button
+                onClick={() => setShowAddComponent(true)}
+                className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors flex items-center gap-1"
+              >
+                <Plus size={14} /> Add Component
+              </button>
+            </div>
 
-                <div className="flex flex-col items-center justify-center text-center px-4 pt-4 sm:pt-0">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Basic salary (AED)</span>
-                  <div className="text-xl font-black text-gray-900 dark:text-white font-mono">
-                    {formatCurrency(settlementData.basicSalary)}
+            {/* Add Component Modal */}
+            {showAddComponent && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold dark:text-white">Add Salary Component</h3>
+                    <button
+                      onClick={() => setShowAddComponent(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      placeholder="Component Name (e.g., Bonus, Commission)"
+                      value={newComponent.component_name}
+                      onChange={(e) => setNewComponent({ ...newComponent, component_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-green-500 focus:border-green-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Amount"
+                      value={newComponent.value}
+                      onChange={(e) => setNewComponent({ ...newComponent, value: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-green-500 focus:border-green-500"
+                    />
+                    <button
+                      onClick={handleAddSalaryComponent}
+                      className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                    >
+                      Add Component
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex flex-col items-center justify-center text-center px-4 pt-4 sm:pt-0">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Gratuity (AED)</span>
-                  <div className="text-xl font-black text-green-600 dark:text-green-400 font-mono">
-                    {formatCurrency(settlementData.gratuity)}
-                  </div>
-                </div>
-                
               </div>
+            )}
+
+            {/* Salary Components Table */}
+            <div className="border border-gray-100 dark:border-gray-700/50 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Component Name</th>
+                    <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                    <th className="px-4 py-3 text-center font-semibold w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                  {salaryComponents.length > 0 ? (
+                    <>
+                      {salaryComponents.map((component) => (
+                        <tr key={component.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-4 py-3">
+                            {editingComponent === component.id ? (
+                              <input
+                                type="text"
+                                defaultValue={component.component_name}
+                                className="px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded"
+                                id={`comp-name-${component.id}`}
+                              />
+                            ) : (
+                              <span className="font-medium">{component.component_name}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {editingComponent === component.id ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={component.value}
+                                className="px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded text-right"
+                                id={`comp-value-${component.id}`}
+                              />
+                            ) : (
+                              <span className="font-mono">
+                                {currentEmployee?.currency || "AED"} {parseFloat(component.value).toLocaleString()}
+                              </span>
+                            )}
+                           </td>
+                          <td className="px-4 py-3 text-center">
+                            {editingComponent === component.id ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    const newName = document.getElementById(`comp-name-${component.id}`).value;
+                                    const newValue = document.getElementById(`comp-value-${component.id}`).value;
+                                    handleUpdateSalaryComponent(component.id, {
+                                      component_name: newName,
+                                      value: newValue
+                                    });
+                                  }}
+                                  className="text-green-600 hover:text-green-800"
+                                  title="Save"
+                                >
+                                  <Save size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setEditingComponent(null)}
+                                  className="text-gray-500 hover:text-gray-700"
+                                  title="Cancel"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => setEditingComponent(component.id)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="Edit"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteClick(component.id, component.component_name)}
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                           </td>
+                        </tr>
+                      ))}
+                      {/* Total Row */}
+                      <tr className="bg-gray-50 dark:bg-gray-900/50 font-bold">
+                        <td className="px-4 py-3">Total Monthly Salary</td>
+                        <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">
+                          {currentEmployee?.currency || "AED"} {totalSalary.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3"></td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="px-4 py-8 text-center text-gray-500">
+                        No salary components found. Click "Add Component" to add salary details.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
 
-          {/* Settlement Breakdown Table */}
+          {/* Settlement Adjustments Section */}
           <section className="space-y-4">
             <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
               <DollarSign size={16} />
-              Settlement Breakdown
+              Settlement Adjustments
             </h2>
             
             <div className="border border-gray-100 dark:border-gray-700/50 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
               <table className="w-full text-left text-sm text-gray-600 dark:text-gray-300">
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="p-4 font-medium text-gray-800 dark:text-gray-200">Pending salary</td>
-                    <td className="p-4 text-right font-mono font-medium">{formatCurrency(settlementData.pendingSalary)}</td>
-                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="p-4 font-medium text-gray-800 dark:text-gray-200">Housing allowance</td>
-                    <td className="p-4 text-right font-mono font-medium">{formatCurrency(settlementData.housingAllowance)}</td>
-                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="p-4 font-medium text-gray-800 dark:text-gray-200">Transport allowance</td>
-                    <td className="p-4 text-right font-mono font-medium">{formatCurrency(settlementData.transportAllowance)}</td>
-                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="p-4 font-medium text-gray-800 dark:text-gray-200">Gratuity</td>
-                    <td className="p-4 text-right font-mono font-medium">{formatCurrency(settlementData.gratuity)}</td>
-                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="p-4 font-medium text-gray-800 dark:text-gray-200">Leave encashment</td>
-                    <td className="p-4 text-right font-mono font-medium">{formatCurrency(settlementData.leaveEncashment)}</td>
-                   </tr>
-                  
                   {/* Deductions */}
-                  {(settlementData.loanRecovery > 0 || settlementData.noticeShortfall > 0 || settlementData.otherDeductions > 0) && (
-                    <>
-                      <tr className="bg-red-50/30 dark:bg-red-900/10">
-                        <td className="p-4 font-medium text-red-600 dark:text-red-400">Deductions - Loan recovery</td>
-                        <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
-                          - {formatCurrency(settlementData.loanRecovery)}
-                        </td>
-                       </tr>
-                      <tr className="bg-red-50/30 dark:bg-red-900/10">
-                        <td className="p-4 font-medium text-red-600 dark:text-red-400">Deductions - Notice shortfall</td>
-                        <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
-                          - {formatCurrency(settlementData.noticeShortfall)}
-                        </td>
-                       </tr>
-                      <tr className="bg-red-50/30 dark:bg-red-900/10">
-                        <td className="p-4 font-medium text-red-600 dark:text-red-400">Deductions - Other</td>
-                        <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
-                          - {formatCurrency(settlementData.otherDeductions)}
-                        </td>
-                       </tr>
-                    </>
-                  )}
+                  <tr className="bg-red-50/30 dark:bg-red-900/10">
+                    <td className="p-4 font-medium text-red-600 dark:text-red-400">
+                      Loan Recovery
+                      <button
+                        onClick={() => {
+                          const newValue = prompt("Enter loan recovery amount:", settlementData.loanRecovery);
+                          if (newValue !== null) {
+                            setSettlementData(prev => ({ ...prev, loanRecovery: parseFloat(newValue) || 0 }));
+                          }
+                        }}
+                        className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        (Edit)
+                      </button>
+                    </td>
+                    <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
+                      - {formatCurrency(settlementData.loanRecovery)}
+                    </td>
+                  </tr>
+                  <tr className="bg-red-50/30 dark:bg-red-900/10">
+                    <td className="p-4 font-medium text-red-600 dark:text-red-400">
+                      Notice Shortfall
+                      <button
+                        onClick={() => {
+                          const newValue = prompt("Enter notice shortfall amount:", settlementData.noticeShortfall);
+                          if (newValue !== null) {
+                            setSettlementData(prev => ({ ...prev, noticeShortfall: parseFloat(newValue) || 0 }));
+                          }
+                        }}
+                        className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        (Edit)
+                      </button>
+                    </td>
+                    <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
+                      - {formatCurrency(settlementData.noticeShortfall)}
+                    </td>
+                  </tr>
+                  <tr className="bg-red-50/30 dark:bg-red-900/10">
+                    <td className="p-4 font-medium text-red-600 dark:text-red-400">
+                      Other Deductions
+                      <button
+                        onClick={() => {
+                          const newValue = prompt("Enter other deductions amount:", settlementData.otherDeductions);
+                          if (newValue !== null) {
+                            setSettlementData(prev => ({ ...prev, otherDeductions: parseFloat(newValue) || 0 }));
+                          }
+                        }}
+                        className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        (Edit)
+                      </button>
+                    </td>
+                    <td className="p-4 text-right font-mono font-medium text-red-600 dark:text-red-400">
+                      - {formatCurrency(settlementData.otherDeductions)}
+                    </td>
+                  </tr>
                   
                   {/* Additions */}
-                  {settlementData.otherAdditions > 0 && (
-                    <tr className="bg-green-50/30 dark:bg-green-900/10">
-                      <td className="p-4 font-medium text-green-600 dark:text-green-400">Other additions</td>
-                      <td className="p-4 text-right font-mono font-medium text-green-600 dark:text-green-400">
-                        + {formatCurrency(settlementData.otherAdditions)}
-                      </td>
-                     </tr>
-                  )}
+                  <tr className="bg-green-50/30 dark:bg-green-900/10">
+                    <td className="p-4 font-medium text-green-600 dark:text-green-400">
+                      Other Additions
+                      <button
+                        onClick={() => {
+                          const newValue = prompt("Enter other additions amount:", settlementData.otherAdditions);
+                          if (newValue !== null) {
+                            setSettlementData(prev => ({ ...prev, otherAdditions: parseFloat(newValue) || 0 }));
+                          }
+                        }}
+                        className="ml-2 text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        (Edit)
+                      </button>
+                    </td>
+                    <td className="p-4 text-right font-mono font-medium text-green-600 dark:text-green-400">
+                      + {formatCurrency(settlementData.otherAdditions)}
+                    </td>
+                  </tr>
                   
                   {/* Net Payable */}
                   <tr className="bg-gray-50 dark:bg-gray-900/50 border-t-2 border-gray-200 dark:border-gray-700">
-                    <td className="p-5 font-black text-gray-900 dark:text-white uppercase tracking-wider">Net payable</td>
-                    <td className="p-5 text-right font-mono font-black text-lg text-green-600 dark:text-green-400">
+                    <td className="p-5 font-black text-gray-900 dark:text-white uppercase tracking-wider text-lg">
+                      Net Payable
+                    </td>
+                    <td className="p-5 text-right font-mono font-black text-2xl text-green-600 dark:text-green-400">
                       {formatCurrency(settlementData.netPayable)}
                     </td>
-                   </tr>
+                  </tr>
                 </tbody>
-               </table>
+              </table>
             </div>
           </section>
 
@@ -463,7 +764,7 @@ const FinalSettlement = () => {
               ) : (
                 <>
                   <Check size={18} />
-                  Approve settlement
+                  Approve Settlement
                 </>
               )}
             </button>
@@ -471,6 +772,18 @@ const FinalSettlement = () => {
 
         </div>
       </div>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={executeDelete}
+        title="Delete Salary Component"
+        message={`Are you sure you want to delete "${confirmModal.componentName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        loading={confirmModal.loading}
+      />
     </div>
   );
 };
