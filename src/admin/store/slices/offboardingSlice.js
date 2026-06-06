@@ -12,18 +12,13 @@ export const initiateOffboarding = createAsyncThunk(
       
       console.log("Offboarding initiated response:", response.data);
       
-      if (response.data && response.data.status === "success") {
+      if (response.data && (response.data.success === true || response.data.status === "success")) {
         return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data?.message || "Failed to initiate offboarding"
-        );
       }
+      return rejectWithValue(response.data?.message || "Failed to initiate offboarding");
     } catch (error) {
       console.error("Initiate offboarding error:", error.response?.data);
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to initiate offboarding"
-      );
+      return rejectWithValue(error.response?.data?.message || "Failed to initiate offboarding");
     }
   }
 );
@@ -87,12 +82,39 @@ export const fetchOffboardingById = createAsyncThunk(
   }
 );
 
+// Fetch offboarding progress - GET /admin/offboarding/{id}/progress
+export const fetchOffboardingProgress = createAsyncThunk(
+  "offboarding/fetchProgress",
+  async (id, { rejectWithValue }) => {
+    try {
+      console.log(`Fetching offboarding progress for ID: ${id}`);
+      
+      const response = await apiClient.get(`/admin/offboarding/${id}/progress`);
+      
+      console.log("Offboarding progress response:", response.data);
+      
+      if (response.data && response.data.success === true) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data?.message || "Failed to fetch offboarding progress"
+        );
+      }
+    } catch (error) {
+      console.error("Fetch offboarding progress error:", error.response?.data);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch offboarding progress"
+      );
+    }
+  }
+);
+
 // Update Visa Status - POST /admin/offboarding/{id}/visa-status
 export const updateVisaStatus = createAsyncThunk(
   "offboarding/updateVisaStatus",
   async ({ id, visaData }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post(`/admin/offboarding/${id}/visa-status`, visaData);
+      const response = await apiClient.post(`/admin/offboarding/${id}/visa-status/complete`, visaData);
       
       console.log("Visa status updated:", response.data);
       
@@ -293,6 +315,7 @@ export const saveOffboardingDraft = createAsyncThunk(
 const initialState = {
   offboardings: [],
   currentOffboarding: null,
+  currentProgress: null, // Add progress state
   currentStep: 1,
   loading: false,
   error: null,
@@ -342,6 +365,7 @@ const offboardingSlice = createSlice({
     },
     clearCurrentOffboarding: (state) => {
       state.currentOffboarding = null;
+      state.currentProgress = null;
       state.currentStep = 1;
     },
     clearError: (state) => {
@@ -429,6 +453,20 @@ const offboardingSlice = createSlice({
         state.currentStep = stepMap[action.payload.current_step] || 1;
       })
       .addCase(fetchOffboardingById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // Fetch Offboarding Progress
+      .addCase(fetchOffboardingProgress.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchOffboardingProgress.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentProgress = action.payload;
+      })
+      .addCase(fetchOffboardingProgress.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

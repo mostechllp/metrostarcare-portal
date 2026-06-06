@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { showToast } from "../common/Toast";
 import OffboardingHeader from "./OffboardingHeader";
-import { fetchOffboardingById, submitInterview, saveOffboardingDraft } from "../../store/slices/offboardingSlice";
+import { fetchOffboardingById, submitInterview, saveOffboardingDraft, fetchOffboardingProgress } from "../../store/slices/offboardingSlice";
 import { fetchEmployeeById } from "../../store/slices/employeeSlice";
 
 const ExitInterview = () => {
@@ -32,17 +32,19 @@ const ExitInterview = () => {
   });
   
   // Redux state
-  const { currentOffboarding, loading: offboardingLoading } = useSelector((state) => state.offboarding);
+  const { currentOffboarding, loading: offboardingLoading, currentProgress } = useSelector((state) => state.offboarding);
   const { currentEmployee } = useSelector((state) => state.employees);
 
   // Fetch offboarding details on component mount
   useEffect(() => {
     if (offboardingId) {
       dispatch(fetchOffboardingById(offboardingId));
+      dispatch(fetchOffboardingProgress(offboardingId));
     } else {
       const storedOffboardingId = localStorage.getItem("offboarding_id");
       if (storedOffboardingId) {
         dispatch(fetchOffboardingById(storedOffboardingId));
+        dispatch(fetchOffboardingProgress(storedOffboardingId));
       } else {
         setLoading(false);
         showToast("No offboarding session found. Please start from initiation.", "warning");
@@ -83,11 +85,7 @@ const ExitInterview = () => {
         defaultDate.setDate(defaultDate.getDate() + 7);
         setInterviewData(prev => ({
           ...prev,
-          interviewDate: defaultDate.toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-          })
+          interviewDate: defaultDate.toISOString().split('T')[0]
         }));
       }
       
@@ -138,6 +136,9 @@ const ExitInterview = () => {
       })).unwrap();
 
       console.log("Interview submitted:", result);
+      
+      // Refresh progress after submitting interview
+      await dispatch(fetchOffboardingProgress(offboardingId || localStorage.getItem("offboarding_id")));
 
       showToast("Exit interview submitted successfully", "success");
       
@@ -203,6 +204,22 @@ const ExitInterview = () => {
     }
   }, []);
 
+  // Calculate progress from API
+  const apiProgressPercentage = currentProgress?.progress_percentage || 0;
+  const completedStepsFromApi = currentProgress?.completed_steps || 0;
+  const totalStepsFromApi = currentProgress?.total_steps || 7;
+
+  // Format date for display
+  const formatDisplayDate = (dateString) => {
+    if (!dateString) return "Not scheduled";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
   // Loading state
   if (loading || offboardingLoading) {
     return (
@@ -254,9 +271,56 @@ const ExitInterview = () => {
             <div className="flex items-center gap-2">
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60">
                 <Calendar size={14} />
-                Scheduled - {interviewData.interviewDate}
+                Scheduled - {formatDisplayDate(interviewData.interviewDate)}
               </span>
             </div>
+          </div>
+
+          {/* Overall Progress Section */}
+          <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900/30 rounded-xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Offboarding Progress
+              </h3>
+              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                {apiProgressPercentage}%
+              </span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-green-500 transition-all duration-500"
+                style={{ width: `${apiProgressPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>Completed Steps: {completedStepsFromApi}</span>
+              <span>Total Steps: {totalStepsFromApi}</span>
+            </div>
+            
+            {/* Steps Status */}
+            {currentProgress && currentProgress.steps && currentProgress.steps.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Step Status
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {currentProgress.steps.map((step, index) => (
+                    <div key={index} className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        step.status === "completed"
+                          ? "bg-green-500"
+                          : step.status === "in_progress"
+                          ? "bg-blue-500 animate-pulse"
+                          : "bg-gray-300 dark:bg-gray-600"
+                      }`} />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {step.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Form */}

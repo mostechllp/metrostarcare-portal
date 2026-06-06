@@ -87,6 +87,7 @@ const AssetReturn = lazy(() => import("./admin/components/offboarding/AssetRetur
 const ExitInterview = lazy(() => import("./admin/components/offboarding/ExitInterview"));
 const FinalSettlement = lazy(() => import("./admin/components/offboarding/FinalSettlement"));
 const LettersAndClearance = lazy(() => import("./admin/components/offboarding/LettersAndClearance"));
+const ChecklistCategories = lazy(() => import("./admin/pages/ChecklistCategoriesManagement"));
 
 // Lazy load pages - Employee
 const EmployeeDashboard = lazy(() => import("./employee/pages/Dashboard"));
@@ -165,6 +166,7 @@ function App() {
           <Route path="employees/offboarding" element={<Offboarding />} />
           <Route path="employees/offboarding-initiation" element={<OffboardingInitiation />} />
           <Route path="employees/offboarding-checklist-manager" element={<OffboardingChecklistManager />} />
+          <Route path="employees/checklist-categories" element={<ChecklistCategories />} />
           <Route path="employees/asset-management" element={<AssetManagement />} />
           <Route path="employees/assets/types" element={<AssetTypeManagement />} />
           <Route path="employees/visa-cancellation" element={<VisaCancellationAndExit />} />
